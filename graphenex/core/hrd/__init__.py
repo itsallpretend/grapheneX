@@ -265,8 +265,8 @@ class HardenMethod:
         journal = journal or Journal()
         outcome.pre_state = self._probe(dry_run=dry_run)
 
-        if self.check_command and not force:
-            pre = self.check(dry_run=dry_run)
+        if self.check_command and not force and not dry_run:
+            pre = self.check(dry_run=False)
             if pre.ok:
                 outcome.already_compliant = True
                 outcome.result = pre
@@ -279,8 +279,13 @@ class HardenMethod:
 
         run_id = new_run_id()
         outcome.run_id = run_id
-        if self.files:
+        if self.files and not dry_run:
             outcome.backups = journal.backups.capture(run_id, self.files)
+        elif self.files and dry_run:
+            expanded = journal.backups.expand(self.files)
+            outcome.messages.append(
+                "Would snapshot before applying: " + ", ".join(expanded or self.files)
+            )
 
         result = self._run(self.command, dry_run=dry_run)
         outcome.result = result

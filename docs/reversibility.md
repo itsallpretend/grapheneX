@@ -14,7 +14,8 @@ information to be rolled back even if the module is later edited or deleted.
    changed and nothing is journaled unless `--force` is used.
 5. Snapshot every `files` entry (glob-expanded) into
    `~/.local/state/graphenex/backups/<run-id>/`: content, mode and symlink
-   target, plus a marker for paths that do not exist yet.
+   target, plus a marker for paths that do not exist yet. With `--dry-run` the
+   paths are only listed, nothing is written.
 6. Run the apply command with a timeout.
 7. Run `check` again and record whether the module is now compliant.
 8. Append a hash-chained journal record with both commands, their digest, exit

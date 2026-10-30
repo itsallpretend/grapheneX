@@ -232,10 +232,14 @@ def cmd_apply(args) -> int:
                 print(f"[COMPLIANT] {module.qualified_name}: nothing to do")
                 continue
             state = "APPLIED  " if outcome.ok else "FAILED   "
+            if outcome.dry_run:
+                state = "DRY-RUN "
             verified = "" if outcome.verified is None else (
                 " verified" if outcome.verified else " NOT verified"
             )
             print(f"[{state}] {module.qualified_name}: {outcome.result.summary(120)}{verified}")
+            for message in outcome.messages:
+                print(f"            note: {message}")
             if outcome.run_id and outcome.journaled:
                 print(f"            run id: {outcome.run_id}")
             if outcome.restart_required:

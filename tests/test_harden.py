@@ -99,6 +99,8 @@ class HardenMethodTests(unittest.TestCase):
         outcome = module.apply(dry_run=True, journal=self.journal)
         self.assertTrue(outcome.ok)
         self.assertTrue(outcome.dry_run)
+        self.assertFalse(outcome.already_compliant)
+        self.assertIn("would execute", outcome.result.stdout)
         self.assertFalse(outcome.journaled)
         self.assertEqual(target.read_text(), "Setting = insecure\n")
         self.assertEqual(self.journal.records(refresh=True), [])
