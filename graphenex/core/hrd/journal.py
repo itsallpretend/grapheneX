@@ -311,9 +311,6 @@ class BackupManager:
                         result["error"] = entry.error or "backup was not stored"
                         restored.append(result)
                         continue
-                    if path.is_file() and not path.is_symlink():
-                        if sha256_file(path) != entry.sha256:
-                            result["drifted"] = True
                     stored_path = self._stored_path(entry)
                     paths.ensure_private_dir(path.parent)
                     if path.exists() and path.is_dir():
@@ -490,7 +487,7 @@ class Journal:
             handle.write(line)
             handle.flush()
             os.fsync(handle.fileno())
-        if self._cache is not None:
-            self._cache.append(record)
+        # Invalidate the cache: revert state is derived on read.
+        self._cache = None
         return record
 

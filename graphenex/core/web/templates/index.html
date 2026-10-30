@@ -14,13 +14,15 @@
 </head>
 
 <body>
+    <a class="skip-link" href="#modules">Skip to hardening modules</a>
+    <div id="live-region" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
     <!-- Loading screen -->
     <div class="overlay text-center">
         <img class="img-responsive align-middle loading-img"
             src="{{ url_for('static', filename='images/graphenex_logo_white.png') }}" alt="" height="200" width="200">
     </div>
     <!-- Loading screen end-->
-    <div class="container text-center mt-4 mb-4">
+    <main id="maincontent" class="container text-center mt-4 mb-4">
         <div class="row">
             <div class="col-md-4" data-aos="fade-up">
                 <!-- Left side (logo, info etc.) -->
@@ -95,16 +97,33 @@
                         </div>
                     </div>
                     <!-- End System information -->
-                    <p class="mt-4 text-left text-muted" style="font-size: 12px"><strong
+                    <p class="mt-4 text-left text-muted" style="font-size: 12px" aria-live="polite"><strong
                             id="modulecount">{{ mod_count }}</strong>
                         modules found.</p>
+                    <!-- Journal: recent runs and revert -->
+                    <section class="mt-4 text-left" aria-labelledby="history-heading">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 id="history-heading" class="mb-0">Recent changes <i class="fas fa-clock"></i></h6>
+                            <div>
+                                <button type="button" class="btn btn-sm" id="history-refresh">Refresh</button>
+                                <button type="button" class="btn btn-sm" id="revert-last">Revert last</button>
+                            </div>
+                        </div>
+                        <hr>
+                        <ul class="history-list" id="history-list" aria-live="polite">
+                            <li class="text-muted">Nothing applied in this session yet.</li>
+                        </ul>
+                        <p class="mt-2 mb-0 text-muted" style="font-size: 11px" id="history-integrity"></p>
+                    </section>
 
                 </div>
+                {% if authoring %}
                 <div class="col-md-auto">
                     <button class="btn btn-block mt-2" data-toggle="modal" data-target="#addModuleModal"
-                        id="openModal"><i class="fas fa-plus"></i> Add
+                        id="openModal"><i class="fas fa-plus" aria-hidden="true"></i> Add
                         Module</button>
                 </div>
+                {% endif %}
                 <!-- Left side end -->
             </div>
             <div class="col-md-8 mt-3 mt-sm-0" data-aos="fade-up">
@@ -127,11 +146,14 @@
                     </div>
                     <!-- Search input -->
                     <div class="mt-3">
-                        <form action="">
-                            <input class="sr-bar" type="text" placeholder="Search Module" name="modulesearch"
-                                style="background-color: #1E1E1E" id="module_search">
-                            <button class="sr-btn" type="submit" id="btn_mod_search" disabled><i
-                                    class="fa fa-search"></i></button>
+                        <form action="" role="search">
+                            <label class="visually-hidden" for="module_search">Search modules</label>
+                            <input class="sr-bar" type="search" placeholder="Search module" name="modulesearch"
+                                style="background-color: #1E1E1E" id="module_search" autocomplete="off"
+                                spellcheck="false" aria-describedby="search-help">
+                            <button class="sr-btn" type="submit" id="btn_mod_search" aria-label="Search" disabled><i
+                                    class="fa fa-search" aria-hidden="true"></i></button>
+                            <small id="search-help" class="visually-hidden">Results update as you type.</small>
                         </form>
                     </div>
                     <!-- End Search input -->
@@ -141,6 +163,16 @@
                 <div id="modules" style="margin-top: 80px;"></div>
             </div>
         </div>
+    </main>
+    <noscript>
+        <div class="container">
+            <div class="alert alert-warning" role="alert">
+                The web interface needs JavaScript. You can still use every feature from the
+                command line: <code>grapheneX --list</code>, <code>grapheneX --check all</code>,
+                <code>grapheneX --apply &lt;target&gt;</code> and <code>grapheneX --revert last</code>.
+            </div>
+        </div>
+    </noscript>
 
         <!-- Add module modal component -->
         <div class="modal fade" id="addModuleModal" tabindex="-1" role="dialog"
@@ -154,57 +186,104 @@
                         </button>
                     </div>
                     <div class="modal-body text-left">
+                        {% if authoring %}
+                        <p class="text-muted" style="font-size: 13px">
+                            Every module needs an audit command (exit 0 = compliant) and a revert
+                            command or file snapshots. The definition is validated before it is saved.
+                        </p>
                         <label for="amod_ns_list">Namespace</label>
                         <ul class="list-group" id="amod_ns_list">
                             <li class="list-group-item" id="ns_list_new">
                                 <div class="d-flex justify-content-between">
                                     New Namespace
-                                    <i class="fas fa-plus"></i>
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
                                 </div>
                             </li>
                         </ul>
                         <div class="form-group">
-                            <label for="amod_name">Module Name</label>
-                            <input type="text" class="form-control" id="amod_name" placeholder="Name">
+                            <label for="amod_name">Module name</label>
+                            <input type="text" class="form-control" id="amod_name" placeholder="e.g. SSH_Disable_Root_Login">
                         </div>
                         <div class="form-group">
                             <label for="amod_desc">Description</label>
-                            <textarea class="form-control" id="amod_desc" spellcheck="false" rows="5"
-                                placeholder="Description"></textarea>
+                            <textarea class="form-control" id="amod_desc" spellcheck="false" rows="3"
+                                placeholder="What does this module harden?"></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="amod_cmd">Command</label>
-                            <textarea class="form-control consolas" spellcheck="false" id="amod_cmd" rows="5"
-                                placeholder="Hardening Command"></textarea>
+                            <label for="amod_cmd">Apply command</label>
+                            <textarea class="form-control consolas" spellcheck="false" id="amod_cmd" rows="3"
+                                placeholder="Hardening command"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="amod_check">Audit command (exit 0 = compliant)</label>
+                            <textarea class="form-control consolas" spellcheck="false" id="amod_check" rows="2"
+                                placeholder="Verification command"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="amod_revert">Revert command</label>
+                            <textarea class="form-control consolas" spellcheck="false" id="amod_revert" rows="2"
+                                placeholder="Command that undoes the change"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="amod_files">Files to back up (comma separated, optional)</label>
+                            <input type="text" class="form-control consolas" id="amod_files"
+                                placeholder="/etc/ssh/sshd_config">
+                        </div>
+                        <div class="form-group">
+                            <label for="amod_risk">Risk level</label>
+                            <select class="form-control" id="amod_risk">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <div class="input-group">
                                 <div class="input-group-prepend">
                                     <div class="input-group-text">
-                                        <input type="checkbox" id="amod_su">
+                                        <input type="checkbox" id="amod_shell" aria-describedby="amod_shell_label">
+                                    </div>
+                                </div>
+                                <div class="form-control" id="amod_shell_label"><span style="color:#D8D8D8;">
+                                        Needs a shell (pipes, redirects, &amp;&amp;)</span></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text">
+                                        <input type="checkbox" id="amod_su" aria-describedby="amod_su_label">
                                     </div>
                                 </div>
                                 <div class="form-control" id="amod_su_label"><span style="color:#D8D8D8;">
-                                        Requires Superuser Privileges</span></div>
+                                        Requires superuser privileges</span></div>
                             </div>
                         </div>
                         <div class="form-group">
                             <div class="input-group">
                                 <div class="input-group-prepend">
                                     <div class="input-group-text">
-                                        <input type="checkbox" id="amod_rr">
+                                        <input type="checkbox" id="amod_rr" aria-describedby="amod_rr_label">
                                     </div>
                                 </div>
                                 <div class="form-control" id="amod_rr_label"><span style="color:#D8D8D8;">
-                                        Requires Restart</span></div>
+                                        Requires a restart</span></div>
                             </div>
                         </div>
+                        {% else %}
+                        <div class="alert alert-secondary" role="status">
+                            Module authoring is disabled in the web interface.
+                            Start grapheneX with <code>GRAPHENEX_ALLOW_MODULE_AUTHORING=1</code>
+                            or use <code>grapheneX</code> and the <code>manage</code> command.
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-danger" data-dismiss="modal">Cancel <i
                                 class="fas fa-times"></i></button>
-                        <button type="button" class="btn btn-primary" onclick="saveModal()">Add <i
-                                class="fas fa-check"></i></button>
+                        <button type="button" class="btn btn-primary" id="amod_save">Add <i
+                                class="fas fa-check" aria-hidden="true"></i></button>
                     </div>
                 </div>
             </div>

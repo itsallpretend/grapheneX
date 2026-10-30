@@ -1,667 +1,1874 @@
 {
+    "schema_version": 2,
     "firewall": [
         {
-            "name": "Disable_File_Printer_Sharing",
-            "desc": "Disable File and Printer Sharing.",
+            "name": "Firewall_Block_ICMPv4_Echo",
+            "desc": "Block inbound ICMPv4 echo requests (ping) on the firewall.",
+            "command": "netsh advfirewall firewall add rule name=\"grapheneX block ICMPv4 echo\" protocol=icmpv4:8,any dir=in action=block",
+            "check": "netsh advfirewall firewall show rule name=\"grapheneX block ICMPv4 echo\" | findstr /C:\"Block\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "9.3"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "netsh advfirewall firewall delete rule name=\"grapheneX block ICMPv4 echo\""
+        },
+        {
+            "name": "Firewall_Block_ICMPv6_Echo",
+            "desc": "Block inbound ICMPv6 echo requests on the firewall.",
+            "command": "netsh advfirewall firewall add rule name=\"grapheneX block ICMPv6 echo\" protocol=icmpv6:8,any dir=in action=block",
+            "check": "netsh advfirewall firewall show rule name=\"grapheneX block ICMPv6 echo\" | findstr /C:\"Block\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "9.3"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "netsh advfirewall firewall delete rule name=\"grapheneX block ICMPv6 echo\""
+        },
+        {
+            "name": "Firewall_Default_Block_Inbound",
+            "desc": "Block inbound connections by default on every firewall profile.",
+            "command": "netsh advfirewall set allprofiles firewallpolicy blockinbound,allowoutbound",
+            "check": "powershell -NoProfile -NonInteractive -Command \"if ((Get-NetFirewallProfile | Where-Object { $_.DefaultInboundAction -ne 'Block' }).Count -gt 0) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "high",
+            "cis": [
+                "9.2"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "netsh advfirewall set allprofiles firewallpolicy allowinbound,allowoutbound",
+            "probe": "netsh advfirewall show allprofiles firewallpolicy",
+            "notes": "Revert restores the Windows default policy (allow inbound)."
+        },
+        {
+            "name": "Firewall_Default_Deny_Incoming",
+            "desc": "Set the default inbound policy to deny while allowing outbound traffic.",
+            "command": "ufw default deny incoming",
+            "check": "ufw status verbose | grep -q 'Default: deny (incoming)'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "3.5.1.2",
+                "3.5.1.3"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "ufw default allow incoming",
+            "files": [
+                "/etc/default/ufw"
+            ],
+            "probe": "ufw status verbose",
+            "notes": "The previous /etc/default/ufw is backed up and restored on revert."
+        },
+        {
+            "name": "Firewall_Disable_File_Printer_Sharing",
+            "desc": "Disable the built-in File and Printer Sharing firewall rules.",
             "command": "netsh advfirewall firewall set rule group=\"File and Printer Sharing\" new enable=No",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "check": "powershell -NoProfile -NonInteractive -Command \"if (Get-NetFirewallRule -DisplayGroup 'File and Printer Sharing' -ErrorAction SilentlyContinue | Where-Object { $_.Enabled -eq 'True' }) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "9.3"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "netsh advfirewall firewall set rule group=\"File and Printer Sharing\" new enable=Yes"
         },
         {
-            "name": "Disable_RDP",
-            "desc": "Disable Remote Desktop Protocol.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" /v fDenyTSConnections /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "RDP_Max_Security",
-            "desc": "Maximizes the security of Remote Desktop Connections by adjusting encryption settings.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp\" /v MinEncryptionLevel /t REG_DWORD /d 4 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "Enable_Firewall",
-            "desc": "Enable firewall on all profiles.",
+            "name": "Firewall_Enable_All_Profiles",
+            "desc": "Enable Windows Defender Firewall for the domain, private and public profiles.",
             "command": "netsh advfirewall set allprofiles state on",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "check": "powershell -NoProfile -NonInteractive -Command \"if ((Get-NetFirewallProfile | Where-Object { -not $_.Enabled }).Count -gt 0) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "9.1"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "netsh advfirewall set allprofiles state off",
+            "probe": "netsh advfirewall show allprofiles state"
         },
         {
-            "name": "Remove_Enable_LMhosts",
-            "desc": "Remove 'Enable LMhosts' lookup.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Services\\NetBT\\Parameters\\EnableLMHosts\" /v MinEncryptionLevel /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Firewall_Enable_UFW",
+            "desc": "Enable the Uncomplicated Firewall (ufw) and start it at boot.",
+            "command": "ufw --force enable",
+            "check": "ufw status | grep -q 'Status: active'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "3.5.1.1"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "ufw disable",
+            "notes": "Revert stops ufw; rules you added yourself are kept on disk."
         },
         {
-            "name": "Block_All_Ports",
-            "desc": "Block all incoming port connections to enhance network security.",
-            "command": "netsh advfirewall set allprofiles firewallpolicy blockinboundalways,allowoutbound",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "Disable_ICMP_IPV4",
-            "desc": "Disable ICMP (IPV4) requests.",
-            "command": "netsh advfirewall firewall add rule name=\"ICMP Allow incoming V4 echo request\" protocol=icmpv4:8,any dir=in action=block",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "Disable_ICMP_IPV6",
-            "desc": "Disable ICMP (IPV6) requests.",
-            "command": "netsh advfirewall firewall add rule name=\"ICMP Allow incoming V6 echo request\" protocol=icmpv6:8,any dir=in action=block",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "Disable_Sending_Pass_SMB",
-            "desc": "Some non-Microsoft SMB servers only support unencrypted (plain text) password authentication. Disable sending plain text passwords across the network, when authenticating to an SMB server, for increasing the overall security of the environment.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Services\\NetBT\\Parameters\" /v EnablePlainTextPassword /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "Restrict_Shares_Access",
-            "desc": "Restrict access to network shares that can be accessed anonymously.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters\" /v NullSessionShares /t REG_SZ /d (Blank) /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
-        },
-        {
-            "name": "Allow_Only_LMA",
-            "desc": "The Kerberos v5 authentication protocol is the default authentication for domains. NTLM which is less secure, is retained in later Windows versions for compatibility with standalone systems as well as applications that may still use it. Earlier versions of the LM/NTLM protocol are particularly vulnerable to attack and must be prevented.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Control\\Lsa\" /v LmCompatibilityLevel /t REG_DWORD /d 5 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Firewall_Log_Low",
+            "desc": "Log firewall events at the low level so blocked traffic is auditable.",
+            "command": "ufw logging low",
+            "check": "ufw status verbose | grep -q 'Logging: on (low)'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "3.5.2.1"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "ufw logging off"
         }
     ],
     "user": [
         {
-            "name": "Disable_NULL_Session",
-            "desc": "Disable NTLM sessions that are allowed to fall back to Null (unauthenticated) sessions for preventing unauthorized access.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Control\\Lsa\\MSV1_0\" /v allownullsessionfallback /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Account_Inactive_Lock",
+            "desc": "Disable accounts that have been inactive for 30 days by default.",
+            "command": "sed -i 's/^INACTIVE=.*/INACTIVE=30/' /etc/default/useradd",
+            "check": "grep -q '^INACTIVE=30' /etc/default/useradd",
+            "target_os": "linux",
+            "shell": false,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.4.2"
+            ],
+            "nist": [
+                "AC-2"
+            ],
+            "files": [
+                "/etc/default/useradd"
+            ],
+            "notes": "Applies to accounts created after this change; use chage -I 30 for existing accounts."
         },
         {
-            "name": "Disable_Guest_Accounts",
-            "desc": "Disable guest account(s) to prevent temporary login on a windows system without requiring credentials or a password.",
-            "command": "net user guest /active:no",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Account_Lockout_Threshold",
+            "desc": "Lock accounts after five failed logon attempts.",
+            "command": "net accounts /lockoutthreshold:5",
+            "check": "powershell -NoProfile -NonInteractive -Command \"$o = net accounts; if ($o -match 'Lockout threshold:\\s+(\\d+)' -and [int]$Matches[1] -ge 1 -and [int]$Matches[1] -le 5) { exit 0 } else { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "1.2.2"
+            ],
+            "nist": [
+                "AC-7"
+            ],
+            "revert": "net accounts /lockoutthreshold:0",
+            "notes": "A lockout threshold of 0 means accounts never lock out."
         },
         {
-            "name": "Restrict_Permission_Anon_User",
-            "desc": "Restrict permissions of anonymous users.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Control\\Lsa\" /v EveryoneIncludesAnonymous /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_AutoLogon",
+            "desc": "Disable automatic logon and remove stored auto-logon credentials.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v AutoAdminLogon /t REG_SZ /d 0 /f && reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v DefaultPassword /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v AutoAdminLogon | findstr /C:\"0x0\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "2.3.1.1"
+            ],
+            "nist": [
+                "IA-2"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v AutoAdminLogon /f",
+            "probe": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\" /v AutoAdminLogon"
         },
         {
-            "name": "Require_Keys_For_Login",
-            "desc": "Enable the Ctrl+Alt+Del keys to login.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v DisableCAD  /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_Guest_Account",
+            "desc": "Disable the built-in Guest account.",
+            "command": "net user Guest /active:no",
+            "check": "net user Guest | findstr /C:\"Account active\" | findstr /I \"No\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "2.3.1.2"
+            ],
+            "nist": [
+                "AC-2"
+            ],
+            "revert": "net user Guest /active:yes"
         },
         {
-            "name": "Disallow_Anon_Enum_Of_SAM",
-            "desc": "Disallow anonymous logon users (null session connections) to list all account names and enumerate all shared resources.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\" /v NtfsDisableLastAccessUpdate  /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Enable_UAC",
+            "desc": "Enable User Account Control and keep it at the secure desktop prompt.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v EnableLUA /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v EnableLUA | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "high",
+            "cis": [
+                "2.3.11.1"
+            ],
+            "nist": [
+                "AC-6"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v EnableLUA /f",
+            "probe": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v EnableLUA",
+            "notes": "Disabling UAC requires a restart; revert removes the policy value."
         },
         {
-            "name": "Prevent_Anon_SAM_Accounts",
-            "desc": "Disallow anonymous logon users (null session connections) to list all account names for preventing a list of potential points to attack the system.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v RestrictAnonymousSAM  /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Home_Directory_Permissions",
+            "desc": "Restrict home directories to owner access (750) and remove group/other write.",
+            "command": "find /home -mindepth 1 -maxdepth 1 -type d -exec chmod 750 {} +",
+            "check": "if find /home -mindepth 1 -maxdepth 1 -type d -perm /027 | grep -q .; then exit 1; fi",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "6.2.1"
+            ],
+            "nist": [
+                "AC-3"
+            ],
+            "files": [
+                "/home/*"
+            ],
+            "notes": "Original modes are recorded per directory and restored on revert."
         },
         {
-            "name": "Prevent_Group_Policy_Refresh",
-            "desc": "Set Group Policy settings not to be refreshed while a user is currently logged in.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\system\" /v DisableBkGndGroupPolicy  /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Password_History",
+            "desc": "Remember the last 24 passwords to prevent reuse.",
+            "command": "net accounts /uniquepw:24",
+            "check": "powershell -NoProfile -NonInteractive -Command \"$o = net accounts; if ($o -match 'Password history is not enforced' -or ($o -match 'Length of password history maintained:\\s+(\\d+)' -and [int]$Matches[1] -ge 24)) { exit 0 } else { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.1.1"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "revert": "net accounts /uniquepw:0"
         },
         {
-            "name": "Config_Classic_Security_Model",
-            "desc": "Configure the security model for local accounts on Windows systems to align with the classic model, enhancing account protection and access control.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Lsa\" /v ForceGuest  /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Password_Max_Age",
+            "desc": "Require passwords to be changed at least every 365 days.",
+            "command": "sed -i 's/^PASS_MAX_DAYS.*/PASS_MAX_DAYS   365/' /etc/login.defs",
+            "check": "awk '/^PASS_MAX_DAYS/ { exit !($2 <= 365 && $2 > 0) }' /etc/login.defs",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.5.1.1"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "files": [
+                "/etc/login.defs"
+            ],
+            "notes": "Existing accounts keep their current chage values; run chage -M 365 for each user if needed."
         },
         {
-            "name": "Auto_Logout",
-            "desc": "Configure system to automatically log out users who are inactive for 15 minutes. Additionally, users won't be able to modify their command history files.",
-            "command": "echo \"readonly TMOUT=900\" >> /etc/profile.d/idle-users.sh&& echo \"readonly HISTFILE\" >> /etc/profile.d/idle-users.sh&& chmod +x /etc/profile.d/idle-users.sh",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Password_MinLength",
+            "desc": "Require a minimum password length of 14 characters.",
+            "command": "net accounts /minpwlen:14",
+            "check": "powershell -NoProfile -NonInteractive -Command \"$o = net accounts; if ($o -match 'Minimum password length:\\s+(\\d+)' -and [int]$Matches[1] -ge 14) { exit 0 } else { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.1.4"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "revert": "net accounts /minpwlen:0",
+            "probe": "net accounts"
         },
         {
-            "name": "Enable_Password_Control",
-            "desc": "Enable the maximum number of days that the password applies to the root user.",
-            "command": "chage -M 20 root",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Password_Min_Age",
+            "desc": "Prevent users from changing their password more than once per day.",
+            "command": "sed -i 's/^PASS_MIN_DAYS.*/PASS_MIN_DAYS   1/' /etc/login.defs",
+            "check": "awk '/^PASS_MIN_DAYS/ { exit !($2 >= 1) }' /etc/login.defs",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.5.1.2"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "files": [
+                "/etc/login.defs"
+            ]
         },
         {
-            "name": "Set_File_Permissions",
-            "desc": "Restrict GRUB configuration files & directories to root, preventing regular users from accessing or modifying them.",
-            "command": "chown root:root /etc/grub.conf && chown -R root:root /etc/grub.d && chmod og-rwx /etc/grub.conf && chmod og-rwx /etc/grub.conf && chmod -R og-rwx /etc/grub.d",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Password_Quality_Complexity",
+            "desc": "Require at least three of the four character classes (minclass = 3).",
+            "command": "sed -i '/^\\s*minclass\\s*=/d' /etc/security/pwquality.conf && printf 'minclass = 3\\n' >> /etc/security/pwquality.conf",
+            "check": "grep -Eq '^\\s*minclass\\s*=\\s*[3-4]' /etc/security/pwquality.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.4.1"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "files": [
+                "/etc/security/pwquality.conf"
+            ]
         },
         {
-            "name": "Set_Home_Dir_Permission",
-            "desc": "The default setting allows every user on the system to access the home directory. If there's a guest account, it can also read all the data from the home directory.",
-            "command": "chmod 0700 /home/$USER",
-            "require_superuser": "False",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Password_Quality_MinLength",
+            "desc": "Require passwords of at least 14 characters through pam_pwquality.",
+            "command": "sed -i '/^\\s*minlen\\s*=/d' /etc/security/pwquality.conf && printf 'minlen = 14\\n' >> /etc/security/pwquality.conf",
+            "check": "grep -Eq '^\\s*minlen\\s*=\\s*(1[4-9]|[2-9][0-9])' /etc/security/pwquality.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.4.1"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "files": [
+                "/etc/security/pwquality.conf"
+            ]
+        },
+        {
+            "name": "Password_Warn_Age",
+            "desc": "Warn users seven days before their password expires.",
+            "command": "sed -i 's/^PASS_WARN_AGE.*/PASS_WARN_AGE   7/' /etc/login.defs",
+            "check": "awk '/^PASS_WARN_AGE/ { exit !($2 >= 7) }' /etc/login.defs",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.5.1.3"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "files": [
+                "/etc/login.defs"
+            ]
+        },
+        {
+            "name": "Screen_Lock_Timeout",
+            "desc": "Lock the desktop after 10 minutes and require a password on resume.",
+            "command": "reg add \"HKCU\\Control Panel\\Desktop\" /v ScreenSaveActive /t REG_SZ /d 1 /f && reg add \"HKCU\\Control Panel\\Desktop\" /v ScreenSaveTimeOut /t REG_SZ /d 600 /f && reg add \"HKCU\\Control Panel\\Desktop\" /v ScreenSaverIsSecure /t REG_SZ /d 1 /f",
+            "check": "powershell -NoProfile -NonInteractive -Command \"$p='HKCU:\\Control Panel\\Desktop'; if ((Get-ItemProperty $p).ScreenSaveActive -eq '1' -and [int](Get-ItemProperty $p).ScreenSaveTimeOut -le 600 -and (Get-ItemProperty $p).ScreenSaverIsSecure -eq '1') { exit 0 } else { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": false,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "2.3.7.1"
+            ],
+            "nist": [
+                "AC-11"
+            ],
+            "revert": "reg delete \"HKCU\\Control Panel\\Desktop\" /v ScreenSaveActive /f && reg delete \"HKCU\\Control Panel\\Desktop\" /v ScreenSaveTimeOut /f && reg delete \"HKCU\\Control Panel\\Desktop\" /v ScreenSaverIsSecure /f"
+        },
+        {
+            "name": "Shell_Idle_Timeout",
+            "desc": "Log out interactive shells after 15 minutes of inactivity.",
+            "command": "printf 'readonly TMOUT=900\\nexport TMOUT\\n' > /etc/profile.d/99-graphenex-timeout.sh && chmod 0644 /etc/profile.d/99-graphenex-timeout.sh",
+            "check": "grep -q 'TMOUT=900' /etc/profile.d/99-graphenex-timeout.sh",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.5.2"
+            ],
+            "nist": [
+                "AC-11"
+            ],
+            "files": [
+                "/etc/profile.d/99-graphenex-timeout.sh"
+            ],
+            "notes": "The file did not exist before hardening, so revert deletes it again."
         }
     ],
     "network": [
         {
-            "name": "Disable_Lan_Hash_Value",
-            "desc": "Disable storing the hash of the password in the LAN Manager.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v NoLMHash  /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_LLMNR",
+            "desc": "Disable Link-Local Multicast Name Resolution (LLMNR).",
+            "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient\" /v EnableMulticast /t REG_DWORD /d 0 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient\" /v EnableMulticast | findstr /C:\"0x0\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.5.4.2"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient\" /v EnableMulticast /f"
         },
         {
-            "name": "Network_Digitally_Sign_Communications",
-            "desc": "Set the SMB client for only communicating with an SMB server that performs SMB packet signing.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters\" /v RequireSecuritySignature  /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_SMBv1_Server",
+            "desc": "Disable the SMBv1 server protocol.",
+            "command": "powershell -NoProfile -NonInteractive -Command \"Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force\"",
+            "check": "powershell -NoProfile -NonInteractive -Command \"if ((Get-SmbServerConfiguration).EnableSMB1Protocol) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "high",
+            "cis": [
+                "18.3.2"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "powershell -NoProfile -NonInteractive -Command \"Set-SmbServerConfiguration -EnableSMB1Protocol $true -Force\"",
+            "probe": "powershell -NoProfile -NonInteractive -Command \"(Get-SmbServerConfiguration).EnableSMB1Protocol\""
         },
         {
-            "name": "Prevent_Printing_Over_Http",
-            "desc": "Configure the system to prevent printing over HTTP.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows NT\\Printers\" /v DisableHTTPPrinting /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_Teredo",
+            "desc": "Disable the Teredo IPv6 transition tunnel.",
+            "command": "netsh interface teredo set state disabled",
+            "check": "netsh interface teredo show state | findstr /I \"disabled\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.5.17.1"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "netsh interface teredo set state default"
         },
         {
-            "name": "Enable_Cookie_Protection",
-            "desc": "Enable TCP SYN cookie protection",
-            "command": "echo \"net.ipv4.tcp_syncookies = 1\" > /etc/sysctl.d/50-net-stack.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Disable_WDigest_Caching",
+            "desc": "Stop the WDigest provider from caching plaintext credentials.",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\" /v UseLogonCredential /t REG_DWORD /d 0 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\" /v UseLogonCredential | findstr /C:\"0x0\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "medium",
+            "cis": [
+                "2.3.11.8"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "revert": "reg delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\" /v UseLogonCredential /f"
         },
         {
-            "name": "Disable_IP_Source_Routing",
-            "desc": "Disable IP source routing.",
-            "command": "echo \"net.ipv4.conf.all.accept_source_route = 0\" > /etc/sysctl.d/50-net-stack.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Network_Disable_IP_Forwarding",
+            "desc": "Disable IPv4 forwarding on hosts that are not routers.",
+            "command": "printf 'net.ipv4.ip_forward = 0\\n' > /etc/sysctl.d/99-graphenex-forwarding.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n net.ipv4.ip_forward | grep -qx 0",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "high",
+            "cis": [
+                "3.1.1"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-forwarding.conf"
+            ],
+            "notes": "Do not apply this on routers, VPN gateways or container hosts that need forwarding."
         },
         {
-            "name": "Disable_Redirect_Acceptance",
-            "desc": "Disable ICMP redirect acceptance.",
-            "command": "echo \"net.ipv4.conf.all.accept_redirects = 0\" > /etc/sysctl.d/50-net-stack.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Network_Enable_RP_Filter",
+            "desc": "Enable reverse path filtering to drop spoofed source addresses.",
+            "command": "printf 'net.ipv4.conf.all.rp_filter = 1\\nnet.ipv4.conf.default.rp_filter = 1\\n' > /etc/sysctl.d/99-graphenex-rp-filter.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n net.ipv4.conf.all.rp_filter | grep -qx 1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "3.2.7"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-rp-filter.conf"
+            ],
+            "notes": "The drop-in is removed by revert and sysctl --system reloads the previous values."
         },
         {
-            "name": "Ignore_ICMP_IPv4",
-            "desc": "Ignore ICMP IPv4 requests.",
-            "command": "echo \"net.ipv4.icmp_echo_ignore_all = 1\" > /etc/sysctl.d/50-net-stack.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Network_Enable_SYN_Cookies",
+            "desc": "Enable TCP SYN cookies to resist SYN flood attacks.",
+            "command": "printf 'net.ipv4.tcp_syncookies = 1\\n' > /etc/sysctl.d/99-graphenex-syncookies.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n net.ipv4.tcp_syncookies | grep -qx 1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "3.2.8"
+            ],
+            "nist": [
+                "SC-5"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-syncookies.conf"
+            ]
         },
         {
-            "name": "Ignore_Broadcast",
-            "desc": "Ignore IPv4 broadcasts requests.",
-            "command": "echo \"net.ipv4.icmp_echo_ignore_broadcasts = 1\" > /etc/sysctl.d/50-net-stack.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Network_Ignore_ICMP_Redirects",
+            "desc": "Ignore ICMP redirects and do not send redirects.",
+            "command": "printf 'net.ipv4.conf.all.accept_redirects = 0\\nnet.ipv4.conf.default.accept_redirects = 0\\nnet.ipv4.conf.all.secure_redirects = 0\\nnet.ipv4.conf.all.send_redirects = 0\\nnet.ipv4.conf.default.send_redirects = 0\\n' > /etc/sysctl.d/99-graphenex-redirects.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n net.ipv4.conf.all.accept_redirects net.ipv4.conf.all.send_redirects | grep -qvx '[01]' && exit 1; test \"$(sysctl -n net.ipv4.conf.all.accept_redirects)\" = 0 -a \"$(sysctl -n net.ipv4.conf.all.send_redirects)\" = 0",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "3.2.5",
+                "3.2.6"
+            ],
+            "nist": [
+                "SC-7"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-redirects.conf"
+            ]
         },
         {
-            "name": "Force_SYN",
-            "desc": "Make sure new incoming TCP connections are SYN packets.",
-            "command": "iptables -A INPUT -p tcp ! --syn -m state --state NEW -j DROP",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Network_Ignore_Router_Advertisements",
+            "desc": "Ignore IPv6 router advertisements on hosts with static configuration.",
+            "command": "printf 'net.ipv6.conf.all.accept_ra = 0\\nnet.ipv6.conf.default.accept_ra = 0\\n' > /etc/sysctl.d/99-graphenex-ipv6-ra.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n net.ipv6.conf.all.accept_ra | grep -qx 0",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "3.3.9"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-ipv6-ra.conf"
+            ],
+            "notes": "May break SLAAC; skip when IPv6 is configured automatically."
         },
         {
-            "name": "Fragment_Drop",
-            "desc": "Drop incoming packets with fragments.",
-            "command": "iptables -A INPUT -f -j DROP",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Network_Log_Martians",
+            "desc": "Log packets with impossible source addresses (martians).",
+            "command": "printf 'net.ipv4.conf.all.log_martians = 1\\nnet.ipv4.conf.default.log_martians = 1\\n' > /etc/sysctl.d/99-graphenex-martians.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n net.ipv4.conf.all.log_martians | grep -qx 1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "3.2.4"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-martians.conf"
+            ]
         },
         {
-            "name": "XMAS_Drop",
-            "desc": "Drop incoming malformed XMAS packets.",
-            "command": "iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Require_NTLMv2",
+            "desc": "Refuse LM and NTLMv1 authentication (LmCompatibilityLevel = 5).",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v LmCompatibilityLevel /t REG_DWORD /d 5 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v LmCompatibilityLevel | findstr /C:\"0x5\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "high",
+            "cis": [
+                "2.3.11.6"
+            ],
+            "nist": [
+                "IA-5"
+            ],
+            "revert": "reg delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v LmCompatibilityLevel /f",
+            "notes": "Legacy appliances that only speak NTLMv1 will stop authenticating."
         },
         {
-            "name": "Drop_Null",
-            "desc": "Drop incoming malformed NULL packets.",
-            "command": "iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Require_SMB_Signing",
+            "desc": "Require SMB packet signing for the SMB server.",
+            "command": "powershell -NoProfile -NonInteractive -Command \"Set-SmbServerConfiguration -RequireSecuritySignature $true -Force\"",
+            "check": "powershell -NoProfile -NonInteractive -Command \"if (-not (Get-SmbServerConfiguration).RequireSecuritySignature) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "18.3.3"
+            ],
+            "nist": [
+                "SC-8"
+            ],
+            "revert": "powershell -NoProfile -NonInteractive -Command \"Set-SmbServerConfiguration -RequireSecuritySignature $false -Force\""
         },
         {
-            "name": "Set_Permissions_Network_Settings",
-            "desc": "Restrict the usage of 'ping' and 'ifconfig' network commands to root.",
-            "command": "chmod 0750 /bin/ping && chmod 0750 /sbin/ifconfig",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "SSH_Client_Strict_Host_Keys",
+            "desc": "Make the SSH client refuse changed host keys and disable legacy options.",
+            "command": "install -d -m 0755 /etc/ssh/ssh_config.d && printf 'StrictHostKeyChecking ask\\nHashKnownHosts yes\\nForwardAgent no\\nForwardX11 no\\nTunnel no\\nGSSAPIAuthentication no\\n' > /etc/ssh/ssh_config.d/99-graphenex-client.conf",
+            "check": "grep -q '^StrictHostKeyChecking ask' /etc/ssh/ssh_config.d/99-graphenex-client.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.2.2"
+            ],
+            "nist": [
+                "SC-8"
+            ],
+            "files": [
+                "/etc/ssh/ssh_config.d/99-graphenex-client.conf"
+            ]
         },
         {
-            "name": "Set_Permissions_Users",
-            "desc": "Restrict the usage of 'w' and 'who' commands to root.",
-            "command": "chmod 0750 /usr/bin/w && chmod 0750 /usr/bin/who",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "SSH_Disable_Password_Authentication",
+            "desc": "Require public key authentication for SSH logons.",
+            "command": "install -d -m 0755 /etc/ssh/sshd_config.d && printf 'PasswordAuthentication no\\nKbdInteractiveAuthentication no\\n' > /etc/ssh/sshd_config.d/99-graphenex-ssh-disable-password-authentication.conf && sshd -t",
+            "check": "sshd -T 2>/dev/null | grep -qi '^passwordauthentication no'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "high",
+            "cis": [
+                "5.2.4"
+            ],
+            "nist": [
+                "AC-17"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/ssh/sshd_config.d/99-graphenex-ssh-disable-password-authentication.conf"
+            ],
+            "notes": "Verify that key-based access works in a second session before applying. Restart sshd (systemctl restart ssh) for the change to take effect."
         },
         {
-            "name": "Set_Permissions_System_Configuration",
-            "desc": "Restrict the usage of 'locate' and 'whereis' commands to root.",
-            "command": "chmod 0750 /usr/bin/locate && chmod 0750 /usr/bin/whereis",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "SSH_Disable_Root_Login",
+            "desc": "Forbid direct root logon over SSH.",
+            "command": "install -d -m 0755 /etc/ssh/sshd_config.d && printf 'PermitRootLogin no\\n' > /etc/ssh/sshd_config.d/99-graphenex-ssh-disable-root-login.conf && sshd -t",
+            "check": "sshd -T 2>/dev/null | grep -qi '^permitrootlogin no'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "medium",
+            "cis": [
+                "5.2.8"
+            ],
+            "nist": [
+                "AC-17"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/ssh/sshd_config.d/99-graphenex-ssh-disable-root-login.conf"
+            ],
+            "notes": "Make sure an administrative account with sudo exists before applying. Restart sshd (systemctl restart ssh) for the change to take effect."
         },
         {
-            "name": "Disable_IPv6_Systemwide",
-            "desc": "Disable IPv6 System wide to reduce the attack surface of a system (assuming you are not using it).",
-            "command": "echo \"net.ipv6.conf.all.disable_ipv6 = 1\" >> /etc/sysctl.conf && echo \"net.ipv6.conf.default.disable_ipv6 = 1\" >> /etc/sysctl.conf && echo \"net.ipv6.conf.lo.disable_ipv6 = 1 >> /etc/sysctl.conf\"",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "SSH_Disable_Unused_Features",
+            "desc": "Disable X11, agent, TCP and tunnel forwarding and empty passwords.",
+            "command": "install -d -m 0755 /etc/ssh/sshd_config.d && printf 'PermitEmptyPasswords no\\nX11Forwarding no\\nAllowAgentForwarding no\\nAllowTcpForwarding no\\nPermitTunnel no\\n' > /etc/ssh/sshd_config.d/99-graphenex-ssh-disable-unused-features.conf && sshd -t",
+            "check": "sshd -T 2>/dev/null | grep -qi '^x11forwarding no'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "medium",
+            "cis": [
+                "5.2.6",
+                "5.2.9",
+                "5.2.10"
+            ],
+            "nist": [
+                "AC-17"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/ssh/sshd_config.d/99-graphenex-ssh-disable-unused-features.conf"
+            ],
+            "notes": " Restart sshd (systemctl restart ssh) for the change to take effect."
+        },
+        {
+            "name": "SSH_Harden_Crypto",
+            "desc": "Allow only modern ciphers, MACs and key exchange algorithms.",
+            "command": "install -d -m 0755 /etc/ssh/sshd_config.d && printf 'Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr\\nMACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com\\nKexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512\\n' > /etc/ssh/sshd_config.d/99-graphenex-ssh-harden-crypto.conf && sshd -t",
+            "check": "sshd -T 2>/dev/null | grep -qi '^ciphers .*chacha20-poly1305@openssh.com'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "medium",
+            "cis": [
+                "5.2.11",
+                "5.2.12",
+                "5.2.13"
+            ],
+            "nist": [
+                "AC-17"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/ssh/sshd_config.d/99-graphenex-ssh-harden-crypto.conf"
+            ],
+            "notes": " Restart sshd (systemctl restart ssh) for the change to take effect."
+        },
+        {
+            "name": "SSH_Session_Limits",
+            "desc": "Limit authentication attempts, sessions and idle time.",
+            "command": "install -d -m 0755 /etc/ssh/sshd_config.d && printf 'MaxAuthTries 4\\nMaxSessions 10\\nMaxStartups 10:30:60\\nLoginGraceTime 60\\nClientAliveInterval 300\\nClientAliveCountMax 3\\n' > /etc/ssh/sshd_config.d/99-graphenex-ssh-session-limits.conf && sshd -t",
+            "check": "sshd -T 2>/dev/null | grep -qi '^maxauthtries 4'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "low",
+            "cis": [
+                "5.2.5",
+                "5.2.14",
+                "5.2.15",
+                "5.2.16",
+                "5.2.17"
+            ],
+            "nist": [
+                "AC-17"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/ssh/sshd_config.d/99-graphenex-ssh-session-limits.conf"
+            ],
+            "notes": " Restart sshd (systemctl restart ssh) for the change to take effect."
+        },
+        {
+            "name": "SSH_Verbose_Logging",
+            "desc": "Log SSH authentication details at VERBOSE level.",
+            "command": "install -d -m 0755 /etc/ssh/sshd_config.d && printf 'LogLevel VERBOSE\\n' > /etc/ssh/sshd_config.d/99-graphenex-ssh-verbose-logging.conf && sshd -t",
+            "check": "sshd -T 2>/dev/null | grep -qi '^loglevel verbose'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "low",
+            "cis": [
+                "5.2.20"
+            ],
+            "nist": [
+                "AC-17"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/ssh/sshd_config.d/99-graphenex-ssh-verbose-logging.conf"
+            ],
+            "notes": " Restart sshd (systemctl restart ssh) for the change to take effect."
         }
     ],
     "services": [
         {
-            "name": "Prevent_Remote_Assistance",
-            "desc": "Prevent unsolicited offers of help to the system.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows NT\\Terminal Services\" /v fAllowUnsolicited  /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_PowerShell_v2",
+            "desc": "Remove the deprecated PowerShell 2.0 engine.",
+            "command": "dism /online /Disable-Feature:MicrosoftWindowsPowerShellV2Root /NoRestart",
+            "check": "dism /online /Get-FeatureInfo:MicrosoftWindowsPowerShellV2Root | findstr /C:\"State : Disabled\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "18.9.100.2"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "dism /online /Enable-Feature:MicrosoftWindowsPowerShellV2Root /NoRestart"
         },
         {
-            "name": "NTFS_Update_Disable",
-            "desc": "Disable the NTFS updates for extra performance out of the disk volumes.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Control\\Lsa\" /v RestrictAnonymous  /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_Remote_Registry",
+            "desc": "Disable the Remote Registry service.",
+            "command": "sc config RemoteRegistry start= disabled",
+            "check": "sc qc RemoteRegistry | findstr /C:\"DISABLED\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.1"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "sc config RemoteRegistry start= demand",
+            "probe": "sc qc RemoteRegistry"
         },
         {
-            "name": "Machine_Inactivity_15_Min",
-            "desc": "Set the screen saver at a maximum of 15 minutes.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\" /v InactivityTimeoutSecs  /t REG_DWORD /d 0x00000384 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Disable_Telnet_Client",
+            "desc": "Remove the legacy Telnet client feature.",
+            "command": "dism /online /Disable-Feature:TelnetClient /NoRestart",
+            "check": "dism /online /Get-FeatureInfo:TelnetClient | findstr /C:\"State : Disabled\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "4.1"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "dism /online /Enable-Feature:TelnetClient /NoRestart"
         },
         {
-            "name": "IPSec_Exemptions_Limited",
-            "desc": "Configure the System to limit IPSec exemptions.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\IPSEC\" /v NoDefaultExempt  /t REG_DWORD /d 3 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Enable_Defender_PUA",
+            "desc": "Enable Defender protection against potentially unwanted applications.",
+            "command": "powershell -NoProfile -NonInteractive -Command \"Set-MpPreference -PUAProtection 1\"",
+            "check": "powershell -NoProfile -NonInteractive -Command \"if ((Get-MpPreference).PUAProtection -ne 1) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.9.47.5"
+            ],
+            "nist": [
+                "SI-3"
+            ],
+            "revert": "powershell -NoProfile -NonInteractive -Command \"Set-MpPreference -PUAProtection 0\""
         },
         {
-            "name": "WinExplorer_Heap_Corruption_Disable",
-            "desc": "Disable the heap termination on corruption.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows NT\\Terminal Services\" /v fAllowUnsolicited  /t REG_DWORD /d 0 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Enable_Defender_Realtime",
+            "desc": "Enable Microsoft Defender real-time protection.",
+            "command": "powershell -NoProfile -NonInteractive -Command \"Set-MpPreference -DisableRealtimeMonitoring $false\"",
+            "check": "powershell -NoProfile -NonInteractive -Command \"if ((Get-MpPreference).DisableRealtimeMonitoring) { exit 1 }\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "18.9.47.4"
+            ],
+            "nist": [
+                "SI-3"
+            ],
+            "revert": "powershell -NoProfile -NonInteractive -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\""
         },
         {
-            "name": "Remote_Logfiles_Generate",
-            "desc": "Generate log files on Remote Assistance.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\Software\\Policies\\Microsoft\\Windows NT\\Terminal Services\" /v LoggingEnabled /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Service_Disable_Avahi",
+            "desc": "Disable the Avahi mDNS/DNS-SD daemon.",
+            "command": "systemctl disable --now avahi-daemon",
+            "check": "if systemctl is-enabled --quiet avahi-daemon; then exit 1; fi",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "2.2.3"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "systemctl enable --now avahi-daemon",
+            "probe": "systemctl is-enabled avahi-daemon 2>&1; systemctl is-active avahi-daemon 2>&1",
+            "notes": "Rotate to the vendor default enabled state on revert; the pre-change state is recorded in the journal."
         },
         {
-            "name": "SubSystem_Require_Case_Insensitivity",
-            "desc": "Require the case insensitivity restrictions for preventing the access of files or commands that must be restricted.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Kernel\" /v ObCaseInsensitive /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Service_Disable_Bluetooth",
+            "desc": "Disable the Bluetooth service.",
+            "command": "systemctl disable --now bluetooth",
+            "check": "if systemctl is-enabled --quiet bluetooth; then exit 1; fi",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "2.2.6"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "systemctl enable --now bluetooth",
+            "probe": "systemctl is-enabled bluetooth 2>&1; systemctl is-active bluetooth 2>&1",
+            "notes": "Rotate to the vendor default enabled state on revert; the pre-change state is recorded in the journal."
         },
         {
-            "name": "Safe_DLL_Search_Mode",
-            "desc": "Search the %systemroot% for the DLL before searching the current directory or the rest of the path.",
-            "command": "reg add \"HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\" /v SafeDllSearchMode /t REG_DWORD /d 1 /f",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "win"
+            "name": "Service_Disable_CUPS",
+            "desc": "Disable the CUPS printing service.",
+            "command": "systemctl disable --now cups",
+            "check": "if systemctl is-enabled --quiet cups; then exit 1; fi",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "2.2.4"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "systemctl enable --now cups",
+            "probe": "systemctl is-enabled cups 2>&1; systemctl is-active cups 2>&1",
+            "notes": "Rotate to the vendor default enabled state on revert; the pre-change state is recorded in the journal."
         },
         {
-            "name": "Syslog_Service",
-            "desc": "Ensure syslog service is enabled and running.",
-            "command": "systemctl enable rsyslog && systemctl start rsyslog",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Service_Disable_RPCBind",
+            "desc": "Disable the rpcbind service (not needed on NFS clients).",
+            "command": "systemctl disable --now rpcbind",
+            "check": "if systemctl is-enabled --quiet rpcbind; then exit 1; fi",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "2.2.5"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "systemctl enable --now rpcbind",
+            "probe": "systemctl is-enabled rpcbind 2>&1; systemctl is-active rpcbind 2>&1",
+            "notes": "Rotate to the vendor default enabled state on revert; the pre-change state is recorded in the journal."
         },
         {
-            "name": "Set_Permissions_Preload_File",
-            "desc": "Set permissions of the sysctl preload/configuration file.",
-            "command": "chmod 0700 /etc/sysctl.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Service_Enable_Auditd",
+            "desc": "Enable and start the Linux audit daemon.",
+            "command": "systemctl enable --now auditd",
+            "check": "systemctl is-enabled --quiet auditd && systemctl is-active --quiet auditd",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "4.1.1.1"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "systemctl disable --now auditd",
+            "probe": "systemctl is-enabled auditd 2>&1; systemctl is-active auditd 2>&1",
+            "notes": "Revert stops audit logging; the prior unit state is recorded in the journal."
+        },
+        {
+            "name": "Service_Enable_Time_Sync",
+            "desc": "Enable systemd-timesyncd to keep the clock synchronised.",
+            "command": "systemctl enable --now systemd-timesyncd",
+            "check": "systemctl is-enabled --quiet systemd-timesyncd && systemctl is-active --quiet systemd-timesyncd",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.2.1.1"
+            ],
+            "nist": [
+                "AU-8"
+            ],
+            "revert": "systemctl disable --now systemd-timesyncd"
+        },
+        {
+            "name": "Service_Enable_Unattended_Upgrades",
+            "desc": "Enable automatic security updates through unattended-upgrades.",
+            "command": "printf 'APT::Periodic::Update-Package-Lists \"1\";\\nAPT::Periodic::Unattended-Upgrade \"1\";\\n' > /etc/apt/apt.conf.d/99-graphenex-unattended",
+            "check": "grep -q 'Unattended-Upgrade \"1\"' /etc/apt/apt.conf.d/99-graphenex-unattended",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.2.2.1"
+            ],
+            "nist": [
+                "SI-2"
+            ],
+            "files": [
+                "/etc/apt/apt.conf.d/99-graphenex-unattended"
+            ]
         }
     ],
     "kernel": [
         {
-            "name": "Logs_Restrict_Access",
-            "desc": "Restrict access to kernel logs.",
-            "command": "echo \"kernel.dmesg_restrict = 1\" > /etc/sysctl.d/50-dmesg-restrict.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Enable_DEP",
+            "desc": "Require Data Execution Prevention for all applications.",
+            "command": "bcdedit /set nx OptIn",
+            "check": "bcdedit /enum {current} | findstr /I \"nx\" | findstr /I \"OptIn\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "medium",
+            "cis": [
+                "18.1.1"
+            ],
+            "nist": [
+                "SI-16"
+            ],
+            "revert": "bcdedit /set nx OptIn",
+            "probe": "bcdedit /enum {current}",
+            "notes": "Windows defaults to OptIn; the probe records whether the setting was already present."
         },
         {
-            "name": "Pointers_Restrict_Access",
-            "desc": "Restrict access to kernel pointers.",
-            "command": "echo \"kernel.kptr_restrict = 1\" > /etc/sysctl.d/50-kptr-restrict.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Enable_LSA_Protection",
+            "desc": "Run LSASS as a protected process (RunAsPPL).",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v RunAsPPL /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v RunAsPPL | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "high",
+            "cis": [
+                "2.3.11.9"
+            ],
+            "nist": [
+                "SI-16"
+            ],
+            "revert": "reg delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\" /v RunAsPPL /f",
+            "notes": "Check third-party security agents for LSA protection compatibility before applying."
         },
         {
-            "name": "ExecShield_Protection",
-            "desc": "Enable the ExecShield protection.",
-            "command": "echo \"kernel.exec-shield = 2\" > /etc/sysctl.d/50-exec-shield.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Kernel_Disable_Core_Dumps",
+            "desc": "Disable core dumps for all users and setuid programs.",
+            "command": "printf '* hard core 0\\n' > /etc/security/limits.d/99-graphenex-core.conf && printf 'fs.suid_dumpable = 0\\n' > /etc/sysctl.d/99-graphenex-coredump.conf && sysctl --system >/dev/null",
+            "check": "grep -q 'hard core 0' /etc/security/limits.d/99-graphenex-core.conf && test \"$(sysctl -n fs.suid_dumpable)\" = 0",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.1"
+            ],
+            "nist": [
+                "SC-4"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/security/limits.d/99-graphenex-core.conf",
+                "/etc/sysctl.d/99-graphenex-coredump.conf"
+            ]
         },
         {
-            "name": "Randomise_Memory",
-            "desc": "Randomise the memory space.",
-            "command": "echo \"kernel.randomize_va_space=2\" > /etc/sysctl.d/50-rand-va-space.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Kernel_Randomize_VA_Space",
+            "desc": "Enable full address space layout randomisation (ASLR).",
+            "command": "printf 'kernel.randomize_va_space = 2\\n' > /etc/sysctl.d/99-graphenex-kernel-randomize-va-space.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n kernel.randomize_va_space | grep -qx 2",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.4"
+            ],
+            "nist": [
+                "CM-6"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-kernel-randomize-va-space.conf"
+            ]
+        },
+        {
+            "name": "Kernel_Restrict_Dmesg",
+            "desc": "Restrict access to the kernel ring buffer to root.",
+            "command": "printf 'kernel.dmesg_restrict = 1\\n' > /etc/sysctl.d/99-graphenex-kernel-restrict-dmesg.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n kernel.dmesg_restrict | grep -qx 1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.5"
+            ],
+            "nist": [
+                "CM-6"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-kernel-restrict-dmesg.conf"
+            ]
+        },
+        {
+            "name": "Kernel_Restrict_Kernel_Pointers",
+            "desc": "Hide kernel pointers in /proc and other interfaces.",
+            "command": "printf 'kernel.kptr_restrict = 2\\n' > /etc/sysctl.d/99-graphenex-kernel-restrict-kernel-pointers.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n kernel.kptr_restrict | grep -qx 2",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.6"
+            ],
+            "nist": [
+                "CM-6"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-kernel-restrict-kernel-pointers.conf"
+            ]
+        },
+        {
+            "name": "Kernel_Restrict_Perf_Events",
+            "desc": "Disallow unprivileged performance event monitoring.",
+            "command": "printf 'kernel.perf_event_paranoid = 3\\n' > /etc/sysctl.d/99-graphenex-kernel-restrict-perf-events.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n kernel.perf_event_paranoid | grep -qx 3",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.8"
+            ],
+            "nist": [
+                "CM-6"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-kernel-restrict-perf-events.conf"
+            ]
+        },
+        {
+            "name": "Kernel_Restrict_Ptrace",
+            "desc": "Restrict ptrace to child processes (Yama scope 1).",
+            "command": "printf 'kernel.yama.ptrace_scope = 1\\n' > /etc/sysctl.d/99-graphenex-kernel-restrict-ptrace.conf && sysctl --system >/dev/null",
+            "check": "sysctl -n kernel.yama.ptrace_scope | grep -qx 1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.7"
+            ],
+            "nist": [
+                "CM-6"
+            ],
+            "revert": "sysctl --system >/dev/null",
+            "files": [
+                "/etc/sysctl.d/99-graphenex-kernel-restrict-ptrace.conf"
+            ]
+        },
+        {
+            "name": "Restrict_Kernel_DMA",
+            "desc": "Block DMA access for Thunderbolt and other hot-plug PCI devices unless authorised.",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\DmaGuard\" /v DeviceEnumerationPolicy /t REG_DWORD /d 0 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\DmaGuard\" /v DeviceEnumerationPolicy | findstr /C:\"0x0\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "medium",
+            "cis": [
+                "18.8.14.1"
+            ],
+            "nist": [
+                "SC-41"
+            ],
+            "revert": "reg delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\DmaGuard\" /v DeviceEnumerationPolicy /f"
         }
     ],
     "filesystem": [
         {
-            "name": "Link_Protection",
-            "desc": "Enable hard/soft link protection.",
-            "command": "echo \"fs.protected_hardlinks = 1\" > /etc/sysctl.d/50-fs-hardening.conf && echo \"fs.protected_symlinks = 1\" >> /etc/sysctl.d/50-fs-hardening.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Clear_Pagefile_On_Shutdown",
+            "desc": "Clear the pagefile when Windows shuts down.",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\" /v ClearPageFileAtShutdown /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\" /v ClearPageFileAtShutdown | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.3.1"
+            ],
+            "nist": [
+                "SC-4"
+            ],
+            "revert": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management\" /v ClearPageFileAtShutdown /t REG_DWORD /d 0 /f"
         },
         {
-            "name": "Disable_Uncommon_FS",
-            "desc": "Disable uncommon filesystems.",
-            "command": "echo \"install cramfs /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install freevxfs /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install jffs2 /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install hfs /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install hfsplus /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install squashfs /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install udf /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install fat /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install vfat /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install nfs /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install nfsv3 /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf && echo \"install gfs2 /bin/false\" >> /etc/modprobe.d/uncommon-fs.conf",
-            "require_superuser": "True",
-            "require_restart": "False",
-            "target_os": "linux"
+            "name": "Disable_8dot3_Names",
+            "desc": "Stop NTFS from creating MS-DOS style 8.3 file names.",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\" /v NtfsDisable8dot3NameCreation /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\" /v NtfsDisable8dot3NameCreation | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.3.5"
+            ],
+            "nist": [
+                "CM-6"
+            ],
+            "revert": "reg delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\" /v NtfsDisable8dot3NameCreation /f"
+        },
+        {
+            "name": "Filesystem_Disable_Core_Dumps_User",
+            "desc": "Set a zero core dump limit for interactive users via /etc/security/limits.d.",
+            "command": "printf '* soft core 0\\n* hard core 0\\n' > /etc/security/limits.d/99-graphenex-user-core.conf",
+            "check": "grep -q 'soft core 0' /etc/security/limits.d/99-graphenex-user-core.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.5.1"
+            ],
+            "nist": [
+                "SC-4"
+            ],
+            "files": [
+                "/etc/security/limits.d/99-graphenex-user-core.conf"
+            ]
+        },
+        {
+            "name": "Filesystem_Disable_Removable_Storage",
+            "desc": "Block the usb-storage and firewire kernel modules.",
+            "command": "printf 'install usb-storage /bin/true\\n' > /etc/modprobe.d/99-graphenex-usb-storage.conf && printf 'install firewire-core /bin/true\\n' > /etc/modprobe.d/99-graphenex-firewire.conf && (modprobe -r usb-storage 2>/dev/null || true)",
+            "check": "grep -q 'install usb-storage /bin/true' /etc/modprobe.d/99-graphenex-usb-storage.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "1.1.1.1"
+            ],
+            "nist": [
+                "MP-7"
+            ],
+            "files": [
+                "/etc/modprobe.d/99-graphenex-usb-storage.conf",
+                "/etc/modprobe.d/99-graphenex-firewire.conf"
+            ],
+            "notes": "Already loaded modules stay loaded until unplugged or rebooted."
+        },
+        {
+            "name": "Filesystem_Restrict_Cron_Permissions",
+            "desc": "Restrict cron directories and files to root and require an explicit allow list.",
+            "command": "chmod 700 /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.weekly /etc/cron.monthly 2>/dev/null; chmod 600 /etc/crontab; printf 'root\\n' > /etc/cron.allow; chmod 640 /etc/cron.allow",
+            "check": "test \"$(stat -c %a /etc/cron.d)\" = 700 -a \"$(stat -c %a /etc/crontab)\" = 600 -a -f /etc/cron.allow",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "5.1.1",
+                "5.1.2"
+            ],
+            "nist": [
+                "AC-6"
+            ],
+            "files": [
+                "/etc/cron.d",
+                "/etc/cron.daily",
+                "/etc/cron.hourly",
+                "/etc/cron.weekly",
+                "/etc/cron.monthly",
+                "/etc/crontab",
+                "/etc/cron.allow"
+            ],
+            "notes": "/etc/cron.allow is created by hardening, so revert deletes it again."
+        },
+        {
+            "name": "Filesystem_Restrict_SSH_Key_Permissions",
+            "desc": "Set private SSH host keys to 600 and public keys to 644.",
+            "command": "find /etc/ssh -maxdepth 1 -name 'ssh_host_*_key' -exec chmod 600 {} + && find /etc/ssh -maxdepth 1 -name 'ssh_host_*_key.pub' -exec chmod 644 {} +",
+            "check": "if find /etc/ssh -maxdepth 1 -name 'ssh_host_*_key' -perm /077 | grep -q .; then exit 1; fi",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "5.2.1"
+            ],
+            "nist": [
+                "SC-12"
+            ],
+            "files": [
+                "/etc/ssh/ssh_host_*_key",
+                "/etc/ssh/ssh_host_*_key.pub"
+            ]
+        },
+        {
+            "name": "Filesystem_Restrict_Shadow_Permissions",
+            "desc": "Restrict permissions on password and group databases.",
+            "command": "chmod 640 /etc/shadow /etc/gshadow && chmod 644 /etc/passwd /etc/group",
+            "check": "test \"$(stat -c %a /etc/shadow)\" = 640 -a \"$(stat -c %a /etc/gshadow)\" = 640 -a \"$(stat -c %a /etc/passwd)\" = 644 -a \"$(stat -c %a /etc/group)\" = 644",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "high",
+            "cis": [
+                "6.1.2",
+                "6.1.3",
+                "6.1.4"
+            ],
+            "nist": [
+                "AC-3"
+            ],
+            "files": [
+                "/etc/shadow",
+                "/etc/gshadow",
+                "/etc/passwd",
+                "/etc/group"
+            ],
+            "notes": "Original modes are recorded and restored; a wrong mode on /etc/shadow can lock out logons."
+        },
+        {
+            "name": "Restrict_Removable_Storage",
+            "desc": "Deny read and write access to removable storage devices.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\" /v Deny_All /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\" /v Deny_All | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "18.8.13.1"
+            ],
+            "nist": [
+                "MP-7"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices\" /v Deny_All /f"
         }
     ],
     "other": [
         {
-            "name": "SSH_Disable_Root",
-            "desc": "Disable the option to login directly as root via SSH, use sudo instead.",
-            "command": "echo \"PermitRootLogin no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Audit_Rules_Identity",
+            "desc": "Audit changes to user, group and password databases.",
+            "command": "install -d -m 0750 /etc/audit/rules.d && printf -- '-w /etc/passwd -p wa -k identity\\n-w /etc/shadow -p wa -k identity\\n-w /etc/group -p wa -k identity\\n-w /etc/gshadow -p wa -k identity\\n-w /etc/sudoers -p wa -k identity\\n' > /etc/audit/rules.d/99-graphenex-identity.rules && (augenrules --load >/dev/null 2>&1 || true)",
+            "check": "auditctl -l 2>/dev/null | grep -q 'identity'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "4.1.3"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "augenrules --load >/dev/null 2>&1 || true",
+            "files": [
+                "/etc/audit/rules.d/99-graphenex-identity.rules"
+            ],
+            "notes": "Requires the auditd rules to be loaded; the revert removes the rule file and reloads."
         },
         {
-            "name": "SSH_Disable_Password_Login",
-            "desc": "Disable SSH authentication using passwords and force keys instead.",
-            "command": "echo \"ChallengeResponseAuthentication no\" >> /etc/ssh/sshd_config && echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Audit_Rules_Privilege_Escalation",
+            "desc": "Audit privilege escalation tools and kernel module changes.",
+            "command": "install -d -m 0750 /etc/audit/rules.d && printf -- '-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k privilege\\n-w /var/log/sudo.log -p wa -k privilege\\n-w /sbin/insmod -p x -k privilege\\n-w /sbin/rmmod -p x -k privilege\\n-w /sbin/modprobe -p x -k privilege\\n' > /etc/audit/rules.d/99-graphenex-privilege.rules && (augenrules --load >/dev/null 2>&1 || true)",
+            "check": "auditctl -l 2>/dev/null | grep -q 'privilege'",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "4.1.3"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "augenrules --load >/dev/null 2>&1 || true",
+            "files": [
+                "/etc/audit/rules.d/99-graphenex-privilege.rules"
+            ]
         },
         {
-            "name": "SSH_Disable_Empty_Passwords",
-            "desc": "Disable empty passwords on SSH Authentication.",
-            "command": "echo \"PermitEmptyPasswords no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Disable_AlwaysInstallElevated",
+            "desc": "Stop users from installing packages with elevated privileges.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer\" /v AlwaysInstallElevated /t REG_DWORD /d 0 /f && reg add \"HKCU\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer\" /v AlwaysInstallElevated /t REG_DWORD /d 0 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer\" /v AlwaysInstallElevated | findstr /C:\"0x0\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "18.9.85.1"
+            ],
+            "nist": [
+                "AC-6"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer\" /v AlwaysInstallElevated /f && reg delete \"HKCU\\SOFTWARE\\Policies\\Microsoft\\Windows\\Installer\" /v AlwaysInstallElevated /f"
         },
         {
-            "name": "SSH_Change_Default_Port",
-            "desc": "Change the default SSH port.",
-            "command": "echo \"Port 4567\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Disable_Autorun",
+            "desc": "Disable autorun for all drive types.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoDriveTypeAutoRun /t REG_DWORD /d 255 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoDriveTypeAutoRun | findstr /C:\"0xff\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.9.14.1"
+            ],
+            "nist": [
+                "MP-7"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoDriveTypeAutoRun /f"
         },
         {
-            "name": "SSH_Disable_Protocol_1",
-            "desc": "Older linux distributions still have SSH Protocol 1 available. It has known vulnerabilities, and shouldn't be used anymore.",
-            "command": "echo \"Protocol 2\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Disable_Remote_Assistance",
+            "desc": "Disable Windows Remote Assistance invitations.",
+            "command": "reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\RemoteAssistance\" /v fAllowToGetHelp /t REG_DWORD /d 0 /f",
+            "check": "reg query \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\RemoteAssistance\" /v fAllowToGetHelp | findstr /C:\"0x0\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.9.53.1"
+            ],
+            "nist": [
+                "CM-7"
+            ],
+            "revert": "reg delete \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\RemoteAssistance\" /v fAllowToGetHelp /f"
         },
         {
-            "name": "SSH_Disable_X11_Forwarding",
-            "desc": "The X11 protocol is not security oriented. It should be disabled if not needed.",
-            "command": "echo \"X11Forwarding no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Enable_Module_Logging",
+            "desc": "Log PowerShell module and pipeline usage.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ModuleLogging\" /v EnableModuleLogging /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ModuleLogging\" /v EnableModuleLogging | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.9.100.3"
+            ],
+            "nist": [
+                "AU-12"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ModuleLogging\" /v EnableModuleLogging /f"
         },
         {
-            "name": "SSH_Disable_IPv6",
-            "desc": "Turn off IPv6 for SSH.",
-            "command": "echo \"AddressFamily inet\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Enable_Process_CommandLine_Audit",
+            "desc": "Include command line arguments in process creation events.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\Audit\\ProcessCreation\" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\Audit\\ProcessCreation\" /v ProcessCreationIncludeCmdLine_Enabled | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.9.4.1"
+            ],
+            "nist": [
+                "AU-12"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\Audit\\ProcessCreation\" /v ProcessCreationIncludeCmdLine_Enabled /f"
         },
         {
-            "name": "SSH_Disable_GSSAPI_Auth",
-            "desc": "Disable GSSAPI authentication.",
-            "command": "echo \"GSSAPIAuthentication no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Enable_ScriptBlock_Logging",
+            "desc": "Log PowerShell script block content to the event log.",
+            "command": "reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging\" /v EnableScriptBlockLogging /t REG_DWORD /d 1 /f",
+            "check": "reg query \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging\" /v EnableScriptBlockLogging | findstr /C:\"0x1\"",
+            "target_os": "win",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "18.9.100.1"
+            ],
+            "nist": [
+                "AU-12"
+            ],
+            "revert": "reg delete \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging\" /v EnableScriptBlockLogging /f"
         },
         {
-            "name": "SSH_Disable_Kerberos_Auth",
-            "desc": "Disable Kerberos authentication.",
-            "command": "echo \"KerberosAuthentication no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Journald_Persistent_Storage",
+            "desc": "Keep the systemd journal across reboots.",
+            "command": "install -d -m 2755 -g systemd-journal /var/log/journal && install -d -m 0755 /etc/systemd/journald.conf.d && printf '[Journal]\\nStorage=persistent\\nSystemMaxUse=1G\\n' > /etc/systemd/journald.conf.d/99-graphenex-persistent.conf && systemctl restart systemd-journald",
+            "check": "test -d /var/log/journal && grep -q '^Storage=persistent' /etc/systemd/journald.conf.d/99-graphenex-persistent.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "4.2.1.1"
+            ],
+            "nist": [
+                "AU-11"
+            ],
+            "revert": "systemctl restart systemd-journald",
+            "files": [
+                "/etc/systemd/journald.conf.d/99-graphenex-persistent.conf"
+            ],
+            "notes": "/var/log/journal is left in place on revert; only the configuration drop-in is removed."
         },
         {
-            "name": "SSH_Disable_Banner",
-            "desc": "Disable SSH verbose banner that shows various information about the OS.",
-            "command": "echo \"DebianBanner no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Login_Legal_Banner",
+            "desc": "Show a legal notice before SSH authentication.",
+            "command": "printf 'Authorised use only. All activity is monitored and logged.\\n' > /etc/issue.net && chmod 0644 /etc/issue.net && install -d -m 0755 /etc/ssh/sshd_config.d && printf 'Banner /etc/issue.net\\n' > /etc/ssh/sshd_config.d/99-graphenex-banner.conf && sshd -t",
+            "check": "grep -q '^Banner /etc/issue.net' /etc/ssh/sshd_config.d/99-graphenex-banner.conf && sshd -t",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": true,
+            "risk": "low",
+            "cis": [
+                "5.2.19"
+            ],
+            "nist": [
+                "AC-8"
+            ],
+            "revert": "sshd -t",
+            "files": [
+                "/etc/issue.net",
+                "/etc/ssh/sshd_config.d/99-graphenex-banner.conf"
+            ],
+            "notes": "Revert restores the previous /etc/issue.net and removes the SSH drop-in."
         },
         {
-            "name": "SSH_Max_Auth_Tries",
-            "desc": "Limit the number of SSH login attempts such that after a number of failed attempts, the connection drops.",
-            "command": "echo \"MaxAuthTries 3\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Sudo_Logging",
+            "desc": "Log every sudo command with input and output.",
+            "command": "install -d -m 0750 /etc/sudoers.d && printf 'Defaults log_input, log_output\\nDefaults logfile=\"/var/log/sudo.log\"\\nDefaults iolog_dir=\"/var/log/sudo-io\"\\n' > /etc/sudoers.d/99-graphenex-logging && chmod 0440 /etc/sudoers.d/99-graphenex-logging && visudo -cf /etc/sudoers",
+            "check": "grep -q 'log_input' /etc/sudoers.d/99-graphenex-logging && visudo -cf /etc/sudoers >/dev/null 2>&1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "medium",
+            "cis": [
+                "5.3.1"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "visudo -cf /etc/sudoers >/dev/null 2>&1",
+            "files": [
+                "/etc/sudoers.d/99-graphenex-logging"
+            ]
         },
         {
-            "name": "SSH_Login_Grace_Time",
-            "desc": "Reduce the amount of time (in seconds) a user has to complete authentication after connecting to an SSH server.",
-            "command": "echo \"LoginGraceTime 30\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Sudo_Require_Pty",
+            "desc": "Require a pseudo-terminal for sudo sessions.",
+            "command": "install -d -m 0750 /etc/sudoers.d && printf 'Defaults use_pty\\n' > /etc/sudoers.d/99-graphenex-pty && chmod 0440 /etc/sudoers.d/99-graphenex-pty && visudo -cf /etc/sudoers",
+            "check": "grep -q 'use_pty' /etc/sudoers.d/99-graphenex-pty && visudo -cf /etc/sudoers >/dev/null 2>&1",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "5.3.2"
+            ],
+            "nist": [
+                "AC-6"
+            ],
+            "revert": "visudo -cf /etc/sudoers >/dev/null 2>&1",
+            "files": [
+                "/etc/sudoers.d/99-graphenex-pty"
+            ]
         },
         {
-            "name": "SSH_Disable_Agent_Forwarding",
-            "desc": "Disable Agent forwarding.",
-            "command": "echo \"AllowAgentForwarding no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Tcp_Forwarding",
-            "desc": "Disable TCP forwarding.",
-            "command": "echo \"AllowTcpForwarding no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Tunnel",
-            "desc": "Disable device forwarding.",
-            "command": "echo \"PermitTunnel no\" >> /etc/ssh/sshd_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Client_X11_Forwarding",
-            "desc": "Disable X11 client display forwarding.",
-            "command": "echo \"ForwardX11 no\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Client_Tunnel",
-            "desc": "Disable client tunneling.",
-            "command": "echo \"Tunnel no\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Client_Agent_Forwarding",
-            "desc": "Disable client agent forwarding.",
-            "command": "echo \"ForwardAgent no\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Client_GSSAPI_Auth",
-            "desc": "Disable client GSSAPI authentication.",
-            "command": "echo \"GSSAPIAuthentication no\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Client_HostBased_Auth",
-            "desc": "Disable (client) host based authentication.",
-            "command": "echo \"HostbasedAuthentication no\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Disable_Client_Legacy_Ciphers",
-            "desc": "Disable legacy 'Arcfour' ciphers.",
-            "command": "echo \"Ciphers -arcfour*,-*cbc\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
-        },
-        {
-            "name": "SSH_Client_Key_Warn",
-            "desc": "Get warning if key / fingerprint of remote server has changed.",
-            "command": "echo \"StrictHostKeyChecking ask\" >> /etc/ssh/ssh_config",
-            "require_superuser": "True",
-            "require_restart": "True",
-            "target_os": "linux"
+            "name": "Systemd_Process_Accounting",
+            "desc": "Enable CPU, memory and I/O accounting for all units.",
+            "command": "install -d -m 0755 /etc/systemd/system.conf.d && printf '[Manager]\\nDefaultCPUAccounting=yes\\nDefaultMemoryAccounting=yes\\nDefaultIOAccounting=yes\\nDefaultTasksAccounting=yes\\n' > /etc/systemd/system.conf.d/99-graphenex-accounting.conf && systemctl daemon-reexec",
+            "check": "grep -q 'DefaultCPUAccounting=yes' /etc/systemd/system.conf.d/99-graphenex-accounting.conf",
+            "target_os": "linux",
+            "shell": true,
+            "require_superuser": true,
+            "require_restart": false,
+            "risk": "low",
+            "cis": [
+                "1.1.1.1"
+            ],
+            "nist": [
+                "AU-2"
+            ],
+            "revert": "systemctl daemon-reexec",
+            "files": [
+                "/etc/systemd/system.conf.d/99-graphenex-accounting.conf"
+            ]
         }
     ],
     "presets": [
         {
-            "name": "Kernel_Access_Restriction",
+            "name": "linux_baseline",
+            "desc": "CIS-aligned baseline for Linux servers: kernel and network sysctl, password policy, SSH access, audit daemon, time sync and file permissions.",
+            "risk": "medium",
+            "target_os": "linux",
             "modules": [
-                "kernel/Logs_Restrict_Access",
-                "kernel/Pointers_Restrict_Access"
-            ],
-            "target_os": "linux"
+                "kernel/Kernel_Randomize_VA_Space",
+                "kernel/Kernel_Restrict_Dmesg",
+                "kernel/Kernel_Restrict_Kernel_Pointers",
+                "kernel/Kernel_Restrict_Ptrace",
+                "kernel/Kernel_Disable_Core_Dumps",
+                "network/Network_Enable_RP_Filter",
+                "network/Network_Enable_SYN_Cookies",
+                "network/Network_Ignore_ICMP_Redirects",
+                "network/Network_Log_Martians",
+                "network/SSH_Disable_Root_Login",
+                "network/SSH_Session_Limits",
+                "user/Password_Max_Age",
+                "user/Password_Min_Age",
+                "user/Password_Warn_Age",
+                "user/Password_Quality_MinLength",
+                "user/Account_Inactive_Lock",
+                "user/Shell_Idle_Timeout",
+                "filesystem/Filesystem_Restrict_Shadow_Permissions",
+                "filesystem/Filesystem_Restrict_SSH_Key_Permissions",
+                "services/Service_Enable_Auditd",
+                "services/Service_Enable_Time_Sync",
+                "services/Service_Enable_Unattended_Upgrades",
+                "other/Login_Legal_Banner"
+            ]
         },
         {
-            "name": "Linux_Network_Hardening",
+            "name": "linux_ssh_server",
+            "desc": "SSH server hardening: access control, modern cryptography, session limits, logging and a legal banner.",
+            "risk": "high",
+            "target_os": "linux",
             "modules": [
-                "network/All"
-            ],
-            "target_os": "linux"
+                "network/SSH_Disable_Root_Login",
+                "network/SSH_Disable_Password_Authentication",
+                "network/SSH_Harden_Crypto",
+                "network/SSH_Session_Limits",
+                "network/SSH_Disable_Unused_Features",
+                "network/SSH_Verbose_Logging",
+                "network/SSH_Client_Strict_Host_Keys",
+                "filesystem/Filesystem_Restrict_SSH_Key_Permissions",
+                "other/Login_Legal_Banner"
+            ]
         },
         {
-            "name": "Windows_Network_Hardening",
+            "name": "linux_audit_ready",
+            "desc": "Evidence and accountability: auditd, identity and privilege escalation rules, sudo logging, persistent journal and process accounting.",
+            "risk": "low",
+            "target_os": "linux",
             "modules": [
-                "network/All"
-            ],
-            "target_os": "win"
+                "services/Service_Enable_Auditd",
+                "other/Audit_Rules_Identity",
+                "other/Audit_Rules_Privilege_Escalation",
+                "other/Sudo_Logging",
+                "other/Sudo_Require_Pty",
+                "other/Journald_Persistent_Storage",
+                "other/Systemd_Process_Accounting",
+                "kernel/Kernel_Restrict_Dmesg"
+            ]
         },
         {
-            "name": "Windows_Firewall_Rules",
+            "name": "linux_workstation",
+            "desc": "Workstation profile: local firewall, no unused network services, removable media blocked and automatic security updates.",
+            "risk": "medium",
+            "target_os": "linux",
             "modules": [
-                "firewall/Enable_Firewall",
-                "firewall/Block_All_Ports",
-                "firewall/Disable_File_Sharing",
-                "firewall/Disable_ICMP_IPV4",
-                "firewall/Disable_ICMP_IPV6"
-            ],
-            "target_os": "win"
+                "firewall/Firewall_Enable_UFW",
+                "firewall/Firewall_Default_Deny_Incoming",
+                "firewall/Firewall_Log_Low",
+                "services/Service_Disable_Avahi",
+                "services/Service_Disable_CUPS",
+                "services/Service_Disable_Bluetooth",
+                "services/Service_Enable_Time_Sync",
+                "services/Service_Enable_Unattended_Upgrades",
+                "filesystem/Filesystem_Disable_Removable_Storage",
+                "filesystem/Filesystem_Disable_Core_Dumps_User",
+                "kernel/Kernel_Randomize_VA_Space",
+                "user/Shell_Idle_Timeout"
+            ]
+        },
+        {
+            "name": "linux_hardened_server",
+            "desc": "Everything in the baseline plus the local firewall, audit rules and removal of unused network services.",
+            "risk": "high",
+            "target_os": "linux",
+            "modules": [
+                "firewall/All",
+                "network/All",
+                "kernel/All",
+                "user/All",
+                "services/All",
+                "filesystem/All",
+                "other/All"
+            ]
+        },
+        {
+            "name": "windows_baseline",
+            "desc": "CIS-aligned Windows baseline: firewall, credential protection, account policy, UAC and PowerShell logging.",
+            "risk": "medium",
+            "target_os": "win",
+            "modules": [
+                "firewall/Firewall_Enable_All_Profiles",
+                "firewall/Firewall_Default_Block_Inbound",
+                "network/Disable_LLMNR",
+                "network/Disable_WDigest_Caching",
+                "network/Require_NTLMv2",
+                "network/Require_SMB_Signing",
+                "user/Disable_Guest_Account",
+                "user/Password_MinLength",
+                "user/Password_History",
+                "user/Account_Lockout_Threshold",
+                "user/Enable_UAC",
+                "user/Disable_AutoLogon",
+                "user/Screen_Lock_Timeout",
+                "services/Disable_Remote_Registry",
+                "services/Enable_Defender_Realtime",
+                "other/Enable_ScriptBlock_Logging",
+                "other/Enable_Process_CommandLine_Audit"
+            ]
+        },
+        {
+            "name": "windows_server",
+            "desc": "Windows server profile: SMB and legacy protocol removal, LSA protection, credential hardening and full logging.",
+            "risk": "high",
+            "target_os": "win",
+            "modules": [
+                "firewall/All",
+                "network/Disable_SMBv1_Server",
+                "network/Require_SMB_Signing",
+                "network/Require_NTLMv2",
+                "network/Disable_WDigest_Caching",
+                "kernel/Enable_LSA_Protection",
+                "services/Disable_Remote_Registry",
+                "services/Disable_PowerShell_v2",
+                "other/Enable_ScriptBlock_Logging",
+                "other/Enable_Module_Logging",
+                "other/Enable_Process_CommandLine_Audit",
+                "filesystem/Clear_Pagefile_On_Shutdown"
+            ]
+        },
+        {
+            "name": "windows_workstation",
+            "desc": "Windows workstation profile: UAC, removable media, autorun, Remote Assistance and Defender PUA protection.",
+            "risk": "medium",
+            "target_os": "win",
+            "modules": [
+                "firewall/Firewall_Enable_All_Profiles",
+                "firewall/Firewall_Default_Block_Inbound",
+                "user/Disable_Guest_Account",
+                "user/Enable_UAC",
+                "user/Screen_Lock_Timeout",
+                "user/Disable_AutoLogon",
+                "filesystem/Restrict_Removable_Storage",
+                "other/Disable_Autorun",
+                "other/Disable_Remote_Assistance",
+                "other/Disable_AlwaysInstallElevated",
+                "services/Enable_Defender_PUA"
+            ]
         }
     ]
 }

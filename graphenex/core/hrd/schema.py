@@ -31,6 +31,7 @@ NAMESPACE_RE = re.compile(r"^[a-z][a-z0-9_]{1,32}$")
 CIS_RE = re.compile(r"^[0-9]+(\.[0-9]+){0,3}$")
 NIST_RE = re.compile(r"^[A-Z]{2}-[0-9]+(\.[0-9]+)?$")
 RISK_LEVELS = ("low", "medium", "high", "critical")
+SHELL_MARKERS = ("|", ">", "<", "&&", ";", "`", "$(")
 TARGET_OS = ("linux", "win")
 RESERVED_KEYS = ("presets", "schema_version", "metadata")
 
@@ -172,6 +173,17 @@ def _validate_command(command: str, field_name: str, shell: bool, issues: list, 
         build_argv(command, shell=shell)
     except ValueError as exc:
         issues.append(ModuleIssue(label, field_name, str(exc)))
+        return
+    if not shell and any(marker in command for marker in SHELL_MARKERS):
+        issues.append(
+            ModuleIssue(
+                label,
+                field_name,
+                "contains shell metacharacters but the module does not set "
+                "'shell': true, so they will be passed literally",
+                severity="warning",
+            )
+        )
 
 
 def _validate_paths(paths: list, issues: list, label: str) -> None:
@@ -242,17 +254,17 @@ def normalize_module(raw: dict) -> dict:
     _validate_command(command, "command", shell, issues, label)
     _validate_command(check, "check", shell, issues, label)
 
+    has_files = bool(raw.get("files"))
     revert = raw.get("revert") or ""
     if revert:
         _validate_command(revert, "revert", shell, issues, label)
-    elif not is_irreversible:
+    elif not is_irreversible and not has_files:
         issues.append(
             ModuleIssue(
                 label,
                 "revert",
-                "is required: every module must be able to undo its change "
-                "(declare 'irreversible': true with a reason if that is truly "
-                "impossible)",
+                "is required unless the module snapshots 'files' for "
+                "restore or is declared irreversible with a reason",
             )
         )
 

@@ -4,36 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="robots" content="noindex, nofollow">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
-    <title>Authentication</title>
+    <title>grapheneX authentication</title>
 </head>
 
 <body>
-    <div class="container">
+    <main class="container">
         <div class="d-flex justify-content-center mt-5">
             <div class="text-center">
                 <img class="img-responsive" src="{{ url_for('static', filename='images/graphenex_logo_white.png') }}"
-                    alt="logo" height="200" width="200" id="banner">
-                <h3>grapheneX</h3><hr class="fancy-hr"> 
-                <form method="POST" autocomplete="off" id="authform">
-                    <div class="form-group">
-                        <input class="form-control" type="password" name="token" id="token" placeholder="Access token">
-                        {% with messages = get_flashed_messages() %}
+                    alt="grapheneX logo" height="200" width="200" id="banner">
+                <h1 class="h3">grapheneX</h1>
+                <hr class="fancy-hr">
+                {% if locked %}
+                <div class="alert alert-warning" role="alert">
+                    Too many failed attempts. Try again in {{ retry_after }} seconds.
+                </div>
+                {% else %}
+                <form method="POST" autocomplete="off" id="authform" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="form-group text-left">
+                        <label for="token">Access token</label>
+                        <input class="form-control" type="password" name="token" id="token"
+                            placeholder="Access token" inputmode="text" spellcheck="false"
+                            autocapitalize="none" autocomplete="current-password" required
+                            aria-describedby="token-help token-error" autofocus>
+                        <small id="token-help" class="form-text text-muted">
+                            The token is printed in the terminal where grapheneX was started.
+                        </small>
+                        <div id="token-error" role="alert" aria-live="assertive">
+                            {% with messages = get_flashed_messages() %}
                             {% if messages %}
-                                {% for message in messages %}
-                                    <small class="form-text text-muted">{{ message }}</small>
-                                {% endfor %}
+                            {% for message in messages %}
+                            <small class="form-text text-danger">{{ message }}</small>
+                            {% endfor %}
                             {% endif %}
-                        {% endwith %}
+                            {% endwith %}
+                        </div>
                         <button class="btn btn-block mt-2" type="submit">Verify</button>
                     </div>
                 </form>
+                {% endif %}
             </div>
         </div>
-    </div>
+    </main>
     <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
 </body>
 

@@ -18,7 +18,13 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from graphenex.core.hrd.exec import LinuxExec, WinExec
-from graphenex.core.hrd.journal import Journal, RunRecord, new_run_id, sha256_text
+from graphenex.core.hrd.journal import (
+    Journal,
+    RunRecord,
+    excerpt,
+    new_run_id,
+    sha256_text,
+)
 from graphenex.core.hrd.schema import normalize_module
 from graphenex.core.utils import privileges
 
@@ -60,6 +66,8 @@ def _executor(target_os: str):
 
 @dataclass
 class ApplyOutcome:
+    """Result of applying (or auditing) one module."""
+
     module: str
     run_id: str = ""
     result: Optional[object] = None
@@ -100,6 +108,8 @@ class ApplyOutcome:
 
 @dataclass
 class RevertOutcome:
+    """Result of reverting one journaled run."""
+
     module: str
     run_id: str = ""
     revert_run_id: str = ""
@@ -212,6 +222,8 @@ class HardenMethod:
         probe = getattr(self, "probe", "")
         if not probe:
             return ""
+        result = self._run(probe, dry_run=dry_run)
+        return result.output().strip()
 
     def apply(
         self,
@@ -237,7 +249,7 @@ class HardenMethod:
                 "Re-run with --allow-irreversible to accept that this change "
                 "cannot be undone."
             )
-        if not self.revertible and not allow_unrevertible:
+        if not (self.revert_command or self.files) and not self.irreversible                 and not allow_unrevertible:
             raise PermissionError(
                 f"{self.qualified_name} has no revert definition and is not "
                 "marked irreversible, so grapheneX will not apply it. "
@@ -276,38 +288,51 @@ class HardenMethod:
             except Exception:  # pragma: no cover - defensive
                 outcome.verified = None
 
+        post_hashes = {}
+        if not dry_run and result.ok:
+            from graphenex.core.hrd.journal import sha256_file
+
+            for entry in outcome.backups:
+                if entry.kind == "file" and not entry.missing:
+                    try:
+                        post_hashes[entry.path] = sha256_file(__import__("pathlib").Path(entry.path))
+                    except OSError:
+                        continue
+
         if journal_writer and not dry_run:
-            record = RunRecord(
-                run_id=run_id,
-                action="apply",
-                module=self.qualified_name,
-                namespace=self.namespace,
-                name=self.name,
-                target_os=self.target_os,
-                user=privileges.current_user(),
-                elevated=privileges.is_elevated(),
-                command=self.command,
-                command_sha256=sha256_text(self.command),
-                check_command=self.check_command,
-                revert_command=self.revert_command,
-                shell=self.shell,
-                returncode=result.returncode,
-                ok=result.ok,
-                timed_out=result.timed_out,
-                duration=result.duration,
-                stdout=result.stdout,
-                stderr=result.stderr,
-                pre_state=outcome.pre_state,
-                backups=outcome.backups,
-                requires_restart=bool(self.require_restart),
-                framework_version=str(FRAMEWORK_VERSION),
-                extra={
-                    "verified": outcome.verified,
-                    "cis": list(self.cis),
-                    "risk": self.risk,
-                },
+            journal.append(
+                RunRecord(
+                    run_id=run_id,
+                    action="apply",
+                    module=self.qualified_name,
+                    namespace=self.namespace,
+                    name=self.name,
+                    target_os=self.target_os,
+                    user=privileges.current_user(),
+                    elevated=privileges.is_elevated(),
+                    command=self.command,
+                    command_sha256=sha256_text(self.command),
+                    check_command=self.check_command,
+                    revert_command=self.revert_command,
+                    shell=self.shell,
+                    returncode=result.returncode,
+                    ok=result.ok,
+                    timed_out=result.timed_out,
+                    duration=result.duration,
+                    stdout=excerpt(result.stdout),
+                    stderr=excerpt(result.stderr),
+                    pre_state=outcome.pre_state,
+                    backups=outcome.backups,
+                    requires_restart=bool(self.require_restart),
+                    framework_version=str(FRAMEWORK_VERSION),
+                    extra={
+                        "verified": outcome.verified,
+                        "cis": list(self.cis),
+                        "risk": self.risk,
+                        "post_hashes": post_hashes,
+                    },
+                )
             )
-            journal.append(record)
             outcome.journaled = True
         return outcome
 
@@ -317,124 +342,34 @@ class HardenMethod:
         journal: Optional[Journal] = None,
         dry_run: bool = False,
         record: Optional[RunRecord] = None,
-        journal_writer: bool = True,
     ) -> RevertOutcome:
-        """Undo a previous apply: run the revert command, then restore backups."""
+        """Undo a previous apply using the data recorded in the journal."""
+
+        from graphenex.core.hrd.recovery import revert_record
 
         journal = journal or Journal()
-        outcome = RevertOutcome(module=self.qualified_name, dry_run=dry_run)
-
         if record is None:
             if run_id in (None, "", "last"):
                 pending = journal.pending(module=self.qualified_name)
-                record = pending[0] if pending else None
-                if record is None:
-                    outcome.error = (
-                        f"no pending (not yet reverted) run found for "
-                        f"{self.qualified_name}"
+                if not pending:
+                    return RevertOutcome(
+                        module=self.qualified_name,
+                        error=(
+                            "no pending (not yet reverted) run found for "
+                            f"{self.qualified_name}"
+                        ),
                     )
-                    return outcome
+                record = pending[0]
             else:
                 record = journal.get(run_id)
                 if record is None:
-                    outcome.error = f"unknown run id: {run_id}"
-                    return outcome
-
-        outcome.run_id = record.run_id
-        outcome.pre_state = record.pre_state
-        if record.action != "apply":
-            outcome.error = (
-                f"run {record.run_id} is a {record.action!r} record, only applied "
-                "runs can be reverted"
-            )
-            return outcome
-        if record.reverted:
-            outcome.error = (
-                f"run {record.run_id} was already reverted by "
-                f"{record.reverted_by or 'another run'}"
-            )
-            return outcome
-
-        messages = outcome.messages
-        if record.requires_restart:
-            messages.append(
-                "The original change required a restart; revert it the same way "
-                "for the previous configuration to take effect."
-            )
-        if record.pre_state:
-            messages.append(f"Pre-change state recorded at apply time: {record.pre_state}")
-
-        if record.revert_command:
-            result = self._run(record.revert_command, dry_run=dry_run)
-            outcome.result = result
-            if not result.ok:
-                outcome.error = f"revert command failed: {result.summary()}"
-        if record.backups:
-            if dry_run:
-                outcome.restored = [
-                    {"path": entry.path, "ok": True, "action": "would restore", "drifted": False}
-                    for entry in record.backups
-                ]
-            else:
-                outcome.restored = journal.backups.restore(record.backups)
-                drifted = [item["path"] for item in outcome.restored if item.get("drifted")]
-                if drifted:
-                    messages.append(
-                        "Restored files had been modified after hardening: "
-                        + ", ".join(drifted)
+                    return RevertOutcome(
+                        module=self.qualified_name,
+                        error=f"unknown run id: {run_id}",
                     )
-
-        if not dry_run and self.check_command:
-            # Verification after a revert means: the module no longer reports
-            # compliant, i.e. the hardening is really gone.
-            try:
-                outcome.verified = not self.check().ok
-            except Exception:  # pragma: no cover - defensive
-                outcome.verified = None
-
-        if journal_writer and not dry_run:
-            revert_run_id = new_run_id()
-            outcome.revert_run_id = revert_run_id
-            revert_record = RunRecord(
-                run_id=revert_run_id,
-                action="revert",
-                module=record.module,
-                namespace=record.namespace,
-                name=record.name,
-                target_os=record.target_os,
-                user=privileges.current_user(),
-                elevated=privileges.is_elevated(),
-                command=record.revert_command,
-                command_sha256=sha256_text(record.revert_command or ""),
-                shell=self.shell,
-                returncode=(
-                    outcome.result.returncode if outcome.result is not None else 0
-                ),
-                ok=outcome.ok,
-                duration=(
-                    outcome.result.duration if outcome.result is not None else 0.0
-                ),
-                stdout=(
-                    outcome.result.stdout if outcome.result is not None else ""
-                ),
-                stderr=(
-                    outcome.result.stderr if outcome.result is not None else ""
-                ),
-                pre_state=record.pre_state,
-                backups=record.backups,
-                parent_run_id=record.run_id,
-                framework_version=str(FRAMEWORK_VERSION),
-                extra={
-                    "restored": outcome.restored,
-                    "verified": outcome.verified,
-                    "error": outcome.error,
-                },
-            )
-            journal.append(revert_record)
-            record.reverted = True
-            record.reverted_at = revert_record.timestamp
-            record.reverted_by = revert_run_id
-        return outcome
+        return revert_record(
+            record, journal=journal, dry_run=dry_run, timeout=self.timeout
+        )
 
     # -- backwards compatibility ----------------------------------------
     def execute_command(self):
@@ -446,8 +381,3 @@ class HardenMethod:
                 f"Command for {self.qualified_name} failed: {outcome.result.summary()}"
             )
         return outcome.result.stdout
-
-
-        result = self._run(probe, dry_run=dry_run)
-        return result.output().strip()
-

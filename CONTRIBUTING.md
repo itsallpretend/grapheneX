@@ -16,6 +16,64 @@ Please note we have a code of conduct, please follow it in all your interactions
 4. You may merge the Pull Request in once you have the sign-off of two other developers, or if you 
    do not have permission to do that, you may request the second reviewer to merge it for you.
 
+## Development workflow
+
+### Setting up
+
+```shell
+poetry install            # resolves dependencies and writes poetry.lock
+poetry run grapheneX --validate
+```
+
+The hardening engine (`graphenex/core/hrd/`) and the tests use only the Python
+standard library, so you can also run everything with a plain interpreter:
+
+```shell
+python -m unittest discover -s tests -t . -v
+python -m graphenex --list --json
+```
+
+### Adding or changing a module
+
+Every module must have:
+
+* `name`, `desc`, `command`, `check` and `target_os`;
+* a `revert` command **or** `files` snapshots (or an explicit, justified
+  `irreversible` declaration);
+* `cis` and `nist` control identifiers;
+* `shell: true` if and only if the command needs a shell (pipes, redirects,
+  `&&`);
+* a test run of all four operations before you open the PR:
+
+```shell
+python -m graphenex --validate
+python -m graphenex --apply <namespace/Module> --dry-run
+sudo python -m graphenex --apply <namespace/Module>
+python -m graphenex --check <namespace/Module>
+sudo python -m graphenex --revert last
+python -m graphenex --check <namespace/Module>      # drift again = revert worked
+```
+
+See [docs/modules.md](docs/modules.md) for the schema and authoring rules. A PR
+that adds a module without an audit or revert path will not be merged.
+
+### Security expectations
+
+* Never add `shell=True` to the executor or bypass `graphenex/core/hrd/exec.py`.
+* Never build HTML from strings in the web UI; use DOM APIs and `.text()`.
+* Do not log secrets, tokens or file contents that may contain credentials.
+* New web events must be wrapped in `@auth_socketio` and validate their payload.
+* Keep the loopback default; document any new environment variable in the README.
+* If you touch the web layer or the executor, add or update tests in `tests/`.
+
+### Review checklist
+
+* [ ] `python -m unittest discover -s tests -t .` passes
+* [ ] `python -m graphenex --validate` reports 0 errors
+* [ ] Documentation updated (`README.md`, `docs/`)
+* [ ] Security implications considered and, when relevant, noted in
+      `docs/security-review.md`
+
 ## Code of Conduct
 
 ### Our Pledge

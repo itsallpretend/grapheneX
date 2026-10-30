@@ -1,217 +1,296 @@
+/* grapheneX web interface controller */
+
 $(document).ready(initializePage);
 
 var socket;
+var currentNamespace = "";
 
-function Module(moduleName, moduleDesc, moduleSource, socket) {
-    /*
-    Module object.
-    */
-    this.name = moduleName;
-    this.socket = socket;
-    this.desc = moduleDesc;
-    this.source = moduleSource;
-    this.socket = socket;
+function announce(message) {
+    // Screen readers read this out; it is visually hidden.
+    $("#live-region").text(message);
+}
 
-    this.openDrawer = (animationSpeed) => {
-        this.icon.toggleClass("rotated");
-        this.drawer.slideToggle({
-            duration: animationSpeed
-        });
-    }
+function Module(module, socket) {
+    this.data = module;
+    this.name = module.name;
+    this.iconBase = String(this.name).replace(/[^A-Za-z0-9_-]/g, "_");
+    this.socket = socket;
+    this.lastRunId = "";
 
     this.writeLog = (message) => {
-        var currentTime = new Date().toLocaleTimeString().split(' ')[0];
-        this.logs.val(this.logs.val() + currentTime + " > " + message + "\n");
-    }
+        var currentTime = new Date().toLocaleTimeString();
+        var $logs = $("#" + this.iconBase + "_logs");
+        $logs.val($logs.val() + currentTime + " > " + message + "\n");
+        $logs.scrollTop($logs[0].scrollHeight);
+    };
 
-    this.render = function () {
-        var modules = $("#modules");
-        modules.append(getModuleBox(this.name, this.desc));
+    this.setBusy = (busy) => {
+        $("#" + this.iconBase + "_execute_btn").prop("disabled", busy);
+        $("#" + this.iconBase + "_check_btn").prop("disabled", busy);
+    };
 
-        // Access DOM
-        this.div = $("#" + this.name + "_div")
-        this.area = $("#" + this.name + "_area")
-        this.drawer = $("#" + this.name + "_drawer")
-        this.logs = $("#" + this.name + "_logs")
-        this.button = $("#" + this.name + "_btn")
-        this.icon = $("#" + this.name + "_ico")
-        this.execute_btn = $("#" + this.name + "_execute_btn");
+    this.openDrawer = (open) => {
+        var $drawer = $("#" + this.iconBase + "_drawer");
+        var $button = $("#" + this.iconBase + "_btn");
+        if (open) {
+            $drawer.prop("hidden", false).stop(true, true).slideDown(200);
+        } else {
+            $drawer.stop(true, true).slideUp(200, () => $drawer.prop("hidden", true));
+        }
+        $button.attr("aria-expanded", open ? "true" : "false");
+        $("#" + this.iconBase + "_ico").toggleClass("rotated", open);
+    };
 
-        this.logs.val("[#]: " + this.source + "\n");
-        this.button.click(() => {
-            this.openDrawer(200);
+    this.render = () => {
+        $("#modules").append(getModuleBox(this.data));
+
+        var $button = $("#" + this.iconBase + "_btn");
+        var $execute = $("#" + this.iconBase + "_execute_btn");
+        var $check = $("#" + this.iconBase + "_check_btn");
+        var $revert = $("#" + this.iconBase + "_revert_btn");
+        var $logs = $("#" + this.iconBase + "_logs");
+
+        $logs.val("# " + (this.data.desc || "") + "\n# apply : " + (this.data.source || "") +
+            "\n# audit : " + (this.data.check || "") +
+            "\n# revert: " + (this.data.revert || this.data.revert_strategy || "") + "\n");
+
+        $button.on("click", () => {
+            var expanded = $button.attr("aria-expanded") === "true";
+            this.openDrawer(!expanded);
         });
-        this.area.click(() => {
-            this.openDrawer(200);
-        });
-        this.execute_btn.click(() => {
-            this.execute_btn.find(".fa-cog").addClass("rotate_cogs");
+
+        $execute.on("click", () => {
+            $execute.find("i").addClass("rotate_cogs");
+            this.setBusy(true);
             this.socket.emit("harden", this.name);
+            announce("Applying " + this.name);
         });
+
+        $check.on("click", () => {
+            this.socket.emit("check_module", this.name);
+            announce("Auditing " + this.name);
+        });
+
+        $revert.on("click", () => {
+            this.socket.emit("revert_run", { run_id: this.lastRunId || "last" });
+            announce("Reverting the last change for " + this.name);
+        });
+
         this.socket.on(this.name + "_log", (data) => {
-            if (data.msg != null)
+            if (data.msg) {
                 this.writeLog(data.msg);
-            if (data.state == "success")
-                this.execute_btn.find(".fa-cog").removeClass('rotate_cogs fa-cog').addClass("fa-check");
-            else if (data.state == "error")
-                this.execute_btn.find(".fa-cog").removeClass('rotate_cogs').addClass("fa-times-circle");
+                announce(data.msg.substring(0, 200));
+            }
+            if (data.run_id) {
+                this.lastRunId = data.run_id;
+            }
+            if (data.state === "success" || data.state === "compliant") {
+                this.setBusy(false);
+                $execute.find("i").removeClass("rotate_cogs fa-cog").addClass("fa-check");
+            } else if (data.state === "error" || data.state === "drift") {
+                this.setBusy(false);
+                $execute.find("i").removeClass("rotate_cogs").addClass("fa-times-circle");
+            }
         });
-    }
+    };
+}
+
+function renderModules(modules) {
+    $("#modules").empty();
+    modules.forEach((module) => new Module(module, socket).render());
+    $(".overlay").fadeOut("slow");
 }
 
 /* Search module event */
-search = function () {
-    $("#module_search").on("keyup", function () {
-        query = $(this).val();
+function bindSearch() {
+    $("#module_search").off("keyup").on("keyup", function () {
+        var query = $(this).val();
         setTimeout(() => {
-            socket.emit('search_module', { query: query });
-            socket.on('search_module', (data) => {
-                $("#modules").empty();
-                data.result.forEach(elem => {
-                    var { name, desc, source } = elem
-                    var mod = new Module(name, desc, source, socket);
-                    mod.render();
-                });
-            });
-        }, 500)
-
+            socket.emit("search_module", { query: query });
+        }, 300);
     });
+    $("#module_search").closest("form").off("submit").on("submit", (event) => event.preventDefault());
+}
+
+/* History panel */
+function renderHistory(data) {
+    var $list = $("#history-list").empty();
+    var pending = data.pending || [];
+    if (!data.records || data.records.length === 0) {
+        $("<li>", { class: "text-muted" }).text("Nothing applied yet.").appendTo($list);
+    }
+    data.records.forEach((record) => {
+        var state = record.reverted ? "reverted" : (record.ok ? "applied" : "failed");
+        if (record.action === "audit") {
+            state = record.ok ? "audit: compliant" : "audit: drift";
+        } else if (record.action === "revert") {
+            state = record.ok ? "revert ok" : "revert failed";
+        }
+        var $item = $("<li>").appendTo($list);
+        $("<strong>").text(record.module).appendTo($item);
+        $("<span>", { class: "text-muted" }).text(" \u00b7 " + state + " \u00b7 " + record.run_id).appendTo($item);
+        if (record.action === "apply" && record.ok && pending.indexOf(record.run_id) !== -1) {
+            $("<button>", { type: "button", class: "btn btn-sm ml-2" })
+                .text("Revert")
+                .attr("aria-label", "Revert " + record.module + " run " + record.run_id)
+                .on("click", () => socket.emit("revert_run", { run_id: record.run_id }))
+                .appendTo($item);
+        }
+    });
+    $("#history-integrity").text(
+        data.chain_ok
+            ? "Journal integrity verified (hash chain)."
+            : "WARNING: journal integrity check failed: " + (data.problems || []).join("; ")
+    );
+    $("#revert-last").prop("disabled", pending.length === 0);
+}
+
+function refreshHistory() {
+    socket.emit("get_history", { limit: 20 });
 }
 
 /* New module save event */
-saveModal = () => {
+function saveModal() {
+    var files = ($("#amod_files").val() || "").split(",").map((item) => item.trim()).filter(Boolean);
     socket.emit("add_module", {
-        "ns": $("#amod_ns_list").find(".active").text().trim(),
-        "name": $("#amod_name").val(),
-        "desc": $("#amod_desc").val(),
-        "cmd": $("#amod_cmd").val(),
-        "su": $('#amod_su').prop("checked"),
-        "rr": $('#amod_rr').prop("checked")
+        ns: $("#amod_ns_list").find(".active").text().trim(),
+        name: $("#amod_name").val(),
+        desc: $("#amod_desc").val(),
+        cmd: $("#amod_cmd").val(),
+        check: $("#amod_check").val(),
+        revert: $("#amod_revert").val(),
+        files: files,
+        risk: $("#amod_risk").val(),
+        shell: $("#amod_shell").prop("checked"),
+        su: $("#amod_su").prop("checked"),
+        rr: $("#amod_rr").prop("checked")
     });
 }
 
 /* Prepare the new module modal */
-prepareModal = () => {
-    $("#addModuleModal").on('show.bs.modal', function () {
-        $("#openModal").find('.fa-plus').addClass('rotate_cogs')
-        var _addNsElem = $("#amod_ns_list > li").last();
-        var _input = $("<input class='form-control ' id='amod_new_ns' \
-                            style='padding: .75rem 1.25rem; height: auto;'\
-                            placeholder='Namespace name...'\
-                            type='text' />")
-        _addNsElem.click(() => {
-            if ($('#amod_new_ns').length == 0)
-                _addNsElem.before(_input);
-            _addNsElem.hide();
-            _input.val('');
-            _input.focus();
-            _input.focusout(function () {
-                _input.trigger(jQuery.Event('keypress', { keyCode: 13, which: 13 }));
-            })
-            _input.on('keypress', function (e) {
-                if (e.keyCode == 13) { // Pressed on enter key
-                    var newNsText = _input.val();
-                    var newNsElem = $("<li class='list-group-item' id='new_ns_" + newNsText + "'>" +
-                        newNsText + "</li>")
-                    _input.replaceWith(newNsElem)
-                    newNsElem.addClass('active');
-                    _addNsElem.removeClass('active');
-                    _addNsElem.show();
+function prepareModal() {
+    $("#addModuleModal").on("show.bs.modal", function () {
+        $("#openModal").find(".fa-plus").addClass("rotate_cogs");
+        var $addNsElem = $("#amod_ns_list > li").last();
+        var $input = $("<input>", {
+            class: "form-control",
+            id: "amod_new_ns",
+            style: "padding: .75rem 1.25rem; height: auto;",
+            placeholder: "Namespace name...",
+            type: "text"
+        });
+        $addNsElem.off("click").on("click", () => {
+            if ($("#amod_new_ns").length === 0)
+                $addNsElem.before($input);
+            $addNsElem.hide();
+            $input.val("").focus();
+            $input.off("keypress").on("keypress", function (event) {
+                if (event.keyCode === 13) {
+                    var newNsText = $input.val();
+                    var $newNsElem = $("<li>", { class: "list-group-item", id: "new_ns_" + newNsText })
+                        .text(newNsText);
+                    $input.replaceWith($newNsElem);
+                    $newNsElem.addClass("active");
+                    $addNsElem.removeClass("active").show();
+                    event.preventDefault();
                 }
-            })
-        })
-    })
-    $("#addModuleModal").on('hidden.bs.modal', function () {
-        $("#openModal").find('.fa-plus').removeClass('rotate_cogs')
-    })
+            });
+        });
+    });
+    $("#addModuleModal").on("hidden.bs.modal", function () {
+        $("#openModal").find(".fa-plus").removeClass("rotate_cogs");
+    });
+    $("#amod_save").on("click", saveModal);
 }
 
 /* Show message with modal */
-createMessage = (data) => {
-    var messageClass = 'text-white bg-' + data.tag
-    var _modal = $("#messageModal");
-    _modal.modal({ backdrop: false });  // don't touch background opacity
-    _modal.find(".modal-content").addClass(messageClass);
-    _modal.find(".modal-content").text(data.content);
-    var sec = typeof data.duration === 'undefined' ? 1000 : data.duration;
+function createMessage(data) {
+    var messageClass = "text-white bg-" + String(data.tag || "primary").replace(/[^a-z]/g, "");
+    var $modal = $("#messageModal");
+    $modal.modal({ backdrop: false });
+    $modal.find(".modal-content").addClass(messageClass).text(data.content || "");
+    var seconds = typeof data.duration === "undefined" ? 1000 : data.duration;
     setTimeout(() => {
-        _modal.modal("hide");
-        _modal.find(".modal-content").removeClass(messageClass);
-    }, sec)
+        $modal.modal("hide");
+        $modal.find(".modal-content").removeClass(messageClass);
+    }, seconds);
 }
 
-/* Initialize the page & connect */
+/* Initialize the page and connect */
 function initializePage() {
-    AOS.init(); // AOS scroll library
-    // Mobile div collapse button
-    $("#systemdiv").on('show.bs.collapse', function() {
-        $(".opensystembtn i").addClass("rotate_arrow")
-    })
-    $("#systemdiv").on('hide.bs.collapse', function() {
-        $(".opensystembtn i").removeClass("rotate_arrow")
-    })
+    if (window.AOS) {
+        AOS.init({ disable: window.matchMedia("(prefers-reduced-motion: reduce)").matches });
+    }
+
+    $("#systemdiv").on("show.bs.collapse", function () {
+        $(".opensystembtn i").addClass("rotate_arrow");
+    });
+    $("#systemdiv").on("hide.bs.collapse", function () {
+        $(".opensystembtn i").removeClass("rotate_arrow");
+    });
+
     prepareModal();
-    socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
-    socket.on('log_message', (data) => {
-        createMessage(data);
-    })
-    // Request namespace list
-    socket.emit('get_namespaces', {});
-    // Add namespace string to HTML
-    socket.on('get_namespaces', (data) => {
-        var { namespaces } = data;
-        $("#namespaces").empty()
-        namespaces.forEach(namespace => {
-            $("#namespaces").append('<li class="dropdown-item">' + namespace + '</li>');
-            if ($("#ns_list_" + namespace).length == 0)
-                $("#amod_ns_list").prepend('<li class="list-group-item" id="ns_list_' + namespace +
-                    '">' + namespace + '</li>');
+    socket = io.connect(location.protocol + "//" + document.domain + ":" + location.port);
+
+    socket.on("log_message", createMessage);
+    socket.on("get_history", renderHistory);
+    socket.on("run_recorded", refreshHistory);
+    socket.on("revert_result", (result) => {
+        if (result && result.ok) {
+            announce("Revert completed for " + result.module);
+        }
+        refreshHistory();
+    });
+    socket.on("auth", (data) => {
+        createMessage({ tag: "warning", content: (data && data.text) || "Not authenticated" });
+    });
+
+    $("#history-refresh").on("click", refreshHistory);
+    $("#revert-last").on("click", () => socket.emit("revert_run", { run_id: "last" }));
+
+    socket.emit("get_namespaces", {});
+    socket.on("get_namespaces", (data) => {
+        var namespaces = (data && data.namespaces) || [];
+        $("#namespaces").empty();
+        namespaces.forEach((namespace) => {
+            $("<li>").append($("<button>", { type: "button", class: "dropdown-item" }).text(namespace))
+                .appendTo($("#namespaces"));
+            if ($("#ns_list_" + namespace).length === 0) {
+                $("#amod_ns_list").prepend(
+                    $("<li>", { class: "list-group-item", id: "ns_list_" + namespace }).text(namespace)
+                );
+            }
         });
-        socket.emit('get_current_namespace', {});
-        // Namespace selection
-        $("#namespaces li").click(function (e) {
-            // Don't reload page
-            e.preventDefault()
-            $("#current_namespace").text($(this).text());
-            // 'send_current_namespace' event, will trigger 'get_module'            
-            socket.emit('send_current_namespace', $(this).text());
+        socket.emit("get_current_namespace", {});
+        $("#namespaces").off("click").on("click", "button", function (event) {
+            event.preventDefault();
+            var namespace = $(this).text();
+            $("#current_namespace").text(namespace);
+            socket.emit("send_current_namespace", namespace);
         });
     });
 
-    // Getting current namespace from server
-    socket.on('get_current_namespace', (data) => {
-        $("#current_namespace").text(data.current_namespace);
-        socket.emit('send_current_namespace', data.current_namespace);
+    socket.on("get_current_namespace", (data) => {
+        currentNamespace = data.current_namespace;
+        $("#current_namespace").text(currentNamespace);
+        socket.emit("send_current_namespace", currentNamespace);
     });
 
-    // Getting modules
-    socket.on('get_module', (data) => {
-        $("#modules").empty();
-        data.forEach(elem => {
-            // Render modules
-            var { name, desc, source } = elem
-            var mod = new Module(name, desc, source, socket);
-            mod.render();
-        });
-        // Remove loading screen when page is ready
-        $(".overlay").fadeOut("slow");
-        search();
+    socket.on("get_module", (data) => {
+        renderModules(data || []);
+        bindSearch();
+        refreshHistory();
     });
 
-    // Added new module
-    socket.on('new_module_added', (data) => {
-        $("#addModuleModal").modal('toggle');
-        $("#addModuleModal").find("input,textarea,select").val('').end();
-        $('[id^="new_ns_"]').remove();
-        $("#modulecount").text(data);
-        socket.emit('get_namespaces', {});
+    socket.on("search_module", (data) => {
+        renderModules((data && data.result) || []);
     });
 
-    $('#amod_su_label').click(() => {
-        $('#amod_su').click();
-    });
-
-    $('#amod_rr_label').click(() => {
-        $('#amod_rr').click();
+    socket.on("new_module_added", (count) => {
+        $("#addModuleModal").modal("toggle");
+        $("#addModuleModal").find("input,textarea,select").val("");
+        $("[id^='new_ns_']").remove();
+        $("#modulecount").text(count);
+        socket.emit("get_namespaces", {});
     });
 }

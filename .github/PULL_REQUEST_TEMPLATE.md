@@ -28,3 +28,7 @@
 - [ ] I have updated the documentation accordingly.
 - [ ] I have added tests to cover my changes.
 - [ ] All new and existing tests passed.
+- [ ] New/changed modules include an audit (`check`) and a revert path (or an
+      explicit `irreversible` reason) and pass `python -m graphenex --validate`.
+- [ ] Security implications were considered (see `SECURITY.md` and
+      `docs/security-review.md`).
