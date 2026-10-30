@@ -234,7 +234,7 @@ single-binary, offline-friendly design. This is an accepted risk, documented in
 ## 3. Verification performed
 
 ```shell
-python -m unittest discover -s tests -t . -v   # 85 tests, no third-party deps
+python -m unittest discover -s tests -t . -v   # 86 tests, no third-party deps
 python -m graphenex --validate                 # 84 modules, 8 presets, 0 errors
 python -m graphenex --list --json              # machine-readable inventory
 python -m graphenex --apply <target> --dry-run # no process is spawned

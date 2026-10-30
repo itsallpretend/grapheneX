@@ -139,6 +139,14 @@ class HardenMethodTests(unittest.TestCase):
         self.assertTrue(outcome.ok)
 
     @unittest.skipIf(privileges.is_elevated(), "must run unprivileged")
+    def test_dry_run_of_privileged_module_is_allowed_without_root(self):
+        module, target = self.make_module(require_superuser=True)
+        outcome = module.apply(dry_run=True, journal=self.journal)
+        self.assertTrue(outcome.dry_run)
+        self.assertFalse(outcome.journaled)
+        self.assertEqual(target.read_text(), "Setting = insecure\n")
+
+    @unittest.skipIf(privileges.is_elevated(), "must run unprivileged")
     def test_superuser_module_is_refused_without_root(self):
         module, _ = self.make_module(require_superuser=True)
         with self.assertRaises(PermissionError) as caught:

@@ -1,6 +1,6 @@
 ![grapheneX](https://socialify.git.ci/grapheneX/grapheneX/image?description=1&font=Raleway&forks=1&issues=1&language=1&logo=https%3A%2F%2Fraw.githubusercontent.com%2FgrapheneX%2FgrapheneX%2Fmaster%2Fgraphenex%2Fcore%2Fweb%2Fstatic%2Fimages%2Fgraphenex_logo_white.png&owner=1&pulls=1&stargazers=1&theme=Dark)
 
-# grapheneX [![Release](https://img.shields.io/github/release/grapheneX/grapheneX.svg?style=flat-square)](https://github.com/grapheneX/grapheneX/releases) [![License](https://img.shields.io/github/license/grapheneX/grapheneX.svg?style=flat-square)](./LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen.svg?style=flat-square)](#development--tests)
+# grapheneX [![Release](https://img.shields.io/github/release/grapheneX/grapheneX.svg?style=flat-square)](https://github.com/grapheneX/grapheneX/releases) [![License](https://img.shields.io/github/license/grapheneX/grapheneX.svg?style=flat-square)](./LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen.svg?style=flat-square)](#development--tests)
 
 > In computing, hardening is usually the process of securing a system by reducing its surface of vulnerability, which is larger when a system performs more functions; in principle a single-function system is more secure than a multipurpose one. Reducing available ways of attack typically includes changing default passwords, the removal of unnecessary software, unnecessary usernames or logins, and the disabling or removal of unnecessary services.
 
@@ -236,7 +236,7 @@ directory and delete it securely when no longer needed.
 The hardening engine and the test suite use only the standard library:
 
 ```shell
-python -m unittest discover -s tests -t . -v   # 85 tests
+python -m unittest discover -s tests -t . -v   # 86 tests
 python -m graphenex --validate                 # 84 modules, 0 errors
 python -m graphenex --list --json
 ```

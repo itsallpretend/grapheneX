@@ -257,7 +257,10 @@ class HardenMethod:
                 "--allow-unrevertible to override (not recommended)."
             )
 
-        self._require_superuser()
+        # A dry run changes nothing, so inspecting a privileged module must work
+        # without root as well.
+        if not dry_run:
+            self._require_superuser()
 
         journal = journal or Journal()
         outcome.pre_state = self._probe(dry_run=dry_run)
