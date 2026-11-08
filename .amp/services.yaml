@@ -1,0 +1,8 @@
+services:
+  web:
+    command: .venv/bin/grapheneX --web "127.0.0.1:$PORT"
+    health: /
+    platforms: [linux]
+    portal:
+      title: grapheneX
+      description: Sign in with the access token from `amp orb service logs web`; it changes on every restart.
