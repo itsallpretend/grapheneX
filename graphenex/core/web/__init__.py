@@ -54,7 +54,7 @@ def run_server(args=None, exit_shell=True):
             webbrowser.open(f"http://{server_addr}:{server_port}")
 
         logger.info(f"Your access token: {app.config['ACCESS_TOKEN']}")
-        socketio.run(app, host=server_addr, port=server_port, debug=False)
+        socketio.run(app, host=server_addr, port=server_port, debug=False, allow_unsafe_werkzeug=True)
     except socket.error as e:
         if e.errno == 98:
             logger.error(f"{server_addr}:{server_port} is already in use!")
